@@ -23,22 +23,19 @@
 //- Right StickWalk/Rotate
 //
 //
-//PS2 CONTROLS:
-//[Common Controls]
-//- Right Joystick Button - Turn on/off the bot
-//- Left Joystick Button - Act like Select button
-//- Left (S8) - Switch modes - Walk, Shift, Rotate...
-//- Right (S7) - ...
-//- 
-//- L2Toggle Rotate mode
-//- CircleToggle Single leg mode
-//   - Square        Toggle Balance mode
-//- TriangleMove body to 35 mm from the ground (walk pos) 
-//and back to the ground
-//- D-Pad upBody up 10 mm
-//- D-Pad downBody down 10 mm
-//- D-Pad leftdecrease speed with 50mS
-//- D-Pad rightincrease speed with 50mS
+// Quick and Dirty description of controls... WIP
+// In most cases I try to mention what button on the PS2 things coorespond to..
+// On/OFF - Turning the commander 2 on and off (PS2 start button)
+// R1 - options (Change walk gait, Change Leg in Single Leg) (Select on PS2)
+// R3 - Walk method (Not done yet) - (PS2 R3)
+// L4 - Ballance mode on and off
+// L5 - Stand/Sit (Triangle on PS2)
+// L6+Right Joy UP/DOWN - Body up/down - (PS2 Dpad Up/Down)
+// L6+Right Joy Left/Right - Speed higher/lower - (PS2 DPad left/right)
+// Right Top(S7) - Cycle through options of Normal walk/Double Height/Double Travel) - (PS2 R1, R2)
+// Left Top(S8) - Cycle through modes (Walk, Translate, Rotate, Single Leg) (PS2: Circle, X, L1, L2)
+
+// Note: Left some descriptions of PS2 stuff, especially parts still left to Map/Implement.
 //
 //[Walk Controls]
 //- selectSwitch gaits
@@ -57,13 +54,13 @@
 //- Left StickRotate body X/Z
 //- Right StickRotate body Y
 //
-//[Single leg Controls]
+//[Single leg Controls] - Need to check...
 //- selectSwitch legs
 //- Left StickMove Leg X/Z (relative)
 //- Right StickMove Leg Y (absolute)
 //- R2Hold/release leg position
 //
-//[GP Player Controls]
+//[GP Player Controls] - How to do sequences???
 //- selectSwitch Sequences
 //- R2Start Sequence
 //
