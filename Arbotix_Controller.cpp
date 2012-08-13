@@ -27,6 +27,7 @@
 // In most cases I try to mention what button on the PS2 things coorespond to..
 // On/OFF - Turning the commander 2 on and off (PS2 start button)
 // R1 - options (Change walk gait, Change Leg in Single Leg) (Select on PS2)
+// R2 - Toggle walk method...
 // R3 - Walk method (Not done yet) - (PS2 R3)
 // L4 - Ballance mode on and off
 // L5 - Stand/Sit (Triangle on PS2)
@@ -224,26 +225,31 @@ void CommanderInputController::ControlInput(void)
     }
 
     // We will use L6 with the Right joystick to control both body offset as well as Speed...
-    // Will start off using this as one shot, but then will probably use timer or like to move up or down
-    // Need to remember that the joystick values have been converted to signed values with center at 0
-    if ((command.buttons & BUT_L6) && !(buttonsPrev & BUT_L6)) {
-      if (command.lookV > 32)
-        g_BodyYOffset += 10;
-      else if (command.lookV < -32)
-        g_BodyYOffset -= 10;
+    // We move each pass through this by a percentage of how far we are from center in each direction
+    // We get feedback with height by seeing the robot move up and down.  For Speed, I put in sounds
+    // which give an idea, but only for those whoes robot has a speaker
+    if (command.buttons & BUT_L6 ) {
+      // raise or lower the robot on the joystick up /down
+      // Maybe should have Min/Max
+      g_BodyYOffset += command.lookV/25;
 
-      if (command.lookH > 32) {
-        if (g_InControlState.SpeedControl>0) {
-          g_InControlState.SpeedControl = g_InControlState.SpeedControl - 50;
-          MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
-        }
-      } 
-      else if (command.lookH < -32) {
-        if (g_InControlState.SpeedControl<2000 ) {
-          g_InControlState.SpeedControl = g_InControlState.SpeedControl + 50;
-          MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
-        }
+      // Likewise for Speed control
+      int dspeed = command.lookH / 16;   // 
+      if ((dspeed < 0) && g_InControlState.SpeedControl) {
+        if ((word)(-dspeed) <  g_InControlState.SpeedControl)
+          g_InControlState.SpeedControl += dspeed;
+        else 
+          g_InControlState.SpeedControl = 0;
+        MSound(SOUND_PIN, 1, 50, 1000+g_InControlState.SpeedControl);  //sound SOUND_PIN, [50\4000]
       }
+      if ((dspeed > 0) && (g_InControlState.SpeedControl < 2000)) {
+        g_InControlState.SpeedControl += dspeed;
+        if (g_InControlState.SpeedControl > 2000)
+          g_InControlState.SpeedControl = 2000;
+        MSound(SOUND_PIN, 1, 50, 1000+g_InControlState.SpeedControl);  //sound SOUND_PIN, [50\4000]
+      }
+
+      command.lookH = 0; // don't walk when adjusting the speed here...
     }
 
     //[Walk functions]
@@ -275,21 +281,17 @@ void CommanderInputController::ControlInput(void)
           g_InControlState.LegLiftHeight = 50;
       }
 
-#ifdef LATER 
       // Switch between Walk method 1 && Walk method 2
-      if (command.buttons(PSB_R3)) { // R3 Button Test
+      if ((command.buttons & BUT_R2) && !(buttonsPrev & BUT_R2)) {
         MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
         WalkMethod = !WalkMethod;
       }
-#endif  
 
-#ifdef LATER
       //Walking
       if (WalkMethod)  //(Walk Methode) 
-        g_InControlState.TravelLength.z = (command.lookV-128); //Right Stick Up/Down  
+        g_InControlState.TravelLength.z = (command.lookV); //Right Stick Up/Down  
 
       else
-#endif                
       {
         g_InControlState.TravelLength.x = -command.walkH;
         g_InControlState.TravelLength.z = command.walkV;
@@ -335,9 +337,9 @@ void CommanderInputController::ControlInput(void)
           g_InControlState.SelectedLeg=0;
       }
 
-      g_InControlState.SLLeg.x= (byte)(command.walkH+128)/2; //Left Stick Right/Left
-      g_InControlState.SLLeg.y= (byte)(command.lookV+128)/10; //Right Stick Up/Down
-      g_InControlState.SLLeg.z = (byte)(command.walkV+128)/2; //Left Stick Up/Down
+      g_InControlState.SLLeg.x= (byte)((int)command.walkH+128)/2; //Left Stick Right/Left
+      g_InControlState.SLLeg.y= (byte)((int)command.lookV+128)/10; //Right Stick Up/Down
+      g_InControlState.SLLeg.z = (byte)((int)command.walkV+128)/2; //Left Stick Up/Down
 
       // Hold single leg in place
       if ((command.buttons & BUT_RT) && !(buttonsPrev & BUT_RT)) {
@@ -390,6 +392,9 @@ void CommanderTurnRobotOff(void)
 
 
 #endif //USEPS2
+
+
+
 
 
 
