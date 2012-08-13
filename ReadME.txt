@@ -36,9 +36,17 @@ the risk of damaging the battery.  There are a couple versions voltage detection
 The first version I tried was to ask one of the Servos for the voltage.  At times I found this 
 unreliable and also slow as it required sending serial packets.   
 Later I added an external voltage Resistor divider, that I am currently using a 20K and 4.66K resistor for.  
-There are defines in the Hex_Cfg.h file that allow you to define which IO pin you wish to use (or not).
-Also it allows you to define which resistors you are using. I added this second method after I destroyed 
-my first battery.  For a second level of testing I also added one of these: http://www.trossenrobotics.com/p/3S-LiPo-Battery-Monitor.aspx
+There are defines in the Hex_Cfg.h file that allow you to define which IO pin you wish to use(or not), by updating the 
+define cVoltagePin.  Also it allows you to define which resistors you are using (CVADR1 CVADR2). I added this second method 
+after I destroyed my first battery.  For a second level of testing I also added one of these: 
+http://www.trossenrobotics.com/p/3S-LiPo-Battery-Monitor.aspx
+
+I like some form of visual or Audio feedback, when the robot is doing something.  So I added a speaker to my PhantomX. 
+I am currently using one from Digikey(102-1155-ND), which I simply jamb the two connections into a Servo extension cable and
+plug the other end into the Arbotix controller pin 1.  This is controlled by the definition of SOUND_PIN in Hex_Cfg.h  Normally
+you should connect a speaker through some additional circuitry, as to not overload the IO pin on the processor, I have never had
+a problem with this, however do this at your own risk. In the past I have also done this on other processors using a speaker from
+Radioshack(273-092)
 
 Currently we have the PhantomX running using a few different Input controllers.  
 
