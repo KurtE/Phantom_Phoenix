@@ -409,7 +409,7 @@ void InputController::ControlInput(void)
 #endif // OPT_GPPLAYER
 
       //Calculate walking time delay
-      g_InControlState.InputTimeDelay = 128 -  max( max( abs(g_diyp.s.bRJoyLR-128),  abs(g_diyp.s.bLJoyUD-128)),  abs(g_diyp.s.bLJoyLR-128)) + (128 -(g_diyp.s.bLSlider)/2);
+            g_InControlState.InputTimeDelay = 128 - max(max(abs(ps2x.Analog(PSS_LX) - 128), abs(ps2x.Analog(PSS_LY) - 128)), abs(ps2x.Analog(PSS_RX) - 128));
     }
 
     //Calculate g_InControlState.BodyPos.y
