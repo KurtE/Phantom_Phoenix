@@ -66,6 +66,17 @@ void AdjustLegPositionsToBodyHeight(void);
 // debug handler...
 extern boolean g_fDBGHandleError;
 
+#ifdef c4DOF
+extern const byte cTarsLength[] PROGMEM;
+#endif
+
+#ifdef OPT_BACKGROUND_PROCESS
+#define DoBackgroundProcess()   g_ServoDriver.BackgroundProcess()
+#else
+#define DoBackgroundProcess()   
+#endif
+
+
 
 #ifdef __AVR__
 #if not defined(UBRR1H)

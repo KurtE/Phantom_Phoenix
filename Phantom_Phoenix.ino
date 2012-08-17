@@ -389,7 +389,6 @@ void setup(){
   pinMode(A3, OUTPUT);
   pinMode(A4, OUTPUT);
 #endif    
-  pinMode(0, OUTPUT);
 #ifdef OPT_WALK_UPSIDE_DOWN
   fRobotUpsideDown = false; //Assume off... 
 #ifdef DBGSerial  
@@ -409,7 +408,7 @@ void loop(void)
 {
   //Start time
   lTimerStart = millis(); 
-  g_ServoDriver.BackgroundProcess();
+  DoBackgroundProcess();
   //Read input
   CheckVoltage();        // check our voltages...
   if (!g_fLowVoltageShutdown) {
@@ -451,12 +450,12 @@ void loop(void)
 
   //Single leg control
   SingleLegControl ();
-  g_ServoDriver.BackgroundProcess();
+  DoBackgroundProcess();
 
   //Gait
   GaitSeq();
 
-  g_ServoDriver.BackgroundProcess();
+  DoBackgroundProcess();
 
   //Balance calculations
   TotalTransX = 0;     //reset values used for calculation of balance
@@ -468,14 +467,14 @@ void loop(void)
   if (g_InControlState.BalanceMode) {
     for (LegIndex = 0; LegIndex <= 2; LegIndex++) {    // balance calculations for all Right legs
 
-      g_ServoDriver.BackgroundProcess();
+      DoBackgroundProcess();
       BalCalcOneLeg (-LegPosX[LegIndex]+GaitPosX[LegIndex], 
       LegPosZ[LegIndex]+GaitPosZ[LegIndex], 
       (LegPosY[LegIndex]-(short)pgm_read_word(&cInitPosY[LegIndex]))+GaitPosY[LegIndex], LegIndex);
     }
 
     for (LegIndex = 3; LegIndex <= 5; LegIndex++) {    // balance calculations for all Right legs
-      g_ServoDriver.BackgroundProcess();
+      DoBackgroundProcess();
       BalCalcOneLeg(LegPosX[LegIndex]+GaitPosX[LegIndex], 
       LegPosZ[LegIndex]+GaitPosZ[LegIndex], 
       (LegPosY[LegIndex]-(short)pgm_read_word(&cInitPosY[LegIndex]))+GaitPosY[LegIndex], LegIndex);
@@ -491,7 +490,7 @@ void loop(void)
 
   //Do IK for all Right legs
   for (LegIndex = 0; LegIndex <=2; LegIndex++) {    
-    g_ServoDriver.BackgroundProcess();
+    DoBackgroundProcess();
     BodyFK(-LegPosX[LegIndex]+g_InControlState.BodyPos.x+GaitPosX[LegIndex] - TotalTransX,
     LegPosZ[LegIndex]+g_InControlState.BodyPos.z+GaitPosZ[LegIndex] - TotalTransZ,
     LegPosY[LegIndex]+g_InControlState.BodyPos.y+GaitPosY[LegIndex] - TotalTransY,
@@ -504,7 +503,7 @@ void loop(void)
 
   //Do IK for all Left legs  
   for (LegIndex = 3; LegIndex <=5; LegIndex++) {
-    g_ServoDriver.BackgroundProcess();
+    DoBackgroundProcess();
     BodyFK(LegPosX[LegIndex]-g_InControlState.BodyPos.x+GaitPosX[LegIndex] - TotalTransX,
     LegPosZ[LegIndex]+g_InControlState.BodyPos.z+GaitPosZ[LegIndex] - TotalTransZ,
     LegPosY[LegIndex]+g_InControlState.BodyPos.y+GaitPosY[LegIndex] - TotalTransY,
@@ -553,7 +552,7 @@ void loop(void)
     // note we broke up the servo driver into start/commit that way we can output all of the servo information
     // before we wait and only have the termination information to output after the wait.  That way we hopefully
     // be more accurate with our timings...
-    g_ServoDriver.BackgroundProcess();
+    DoBackgroundProcess();
     StartUpdateServos();
 
     // See if we need to sync our processor with the servo driver while walking to ensure the prev is completed 
@@ -584,7 +583,7 @@ void loop(void)
       DebugWrite(A1, HIGH);
       do {
         // Wait the appropriate time, call any background process while waiting...
-        g_ServoDriver.BackgroundProcess();
+        DoBackgroundProcess();
       } 
       while (millis() < lTimeWaitEnd);
       DebugWrite(A1, LOW);
@@ -671,7 +670,7 @@ void StartUpdateServos()
 
     for (LegIndex = 0; LegIndex <= 5; LegIndex++) {
 #ifdef c4DOF
-    g_ServoDriver.OutputServoInfoForLeg(LegIndex, CoxaAngle1[LegIndex], FemurAngle1[LegIndex], TibiaAngle1[LegIndex], sTarsAngle1[LegIndex]);
+    g_ServoDriver.OutputServoInfoForLeg(LegIndex, CoxaAngle1[LegIndex], FemurAngle1[LegIndex], TibiaAngle1[LegIndex], TarsAngle1[LegIndex]);
 #else
     g_ServoDriver.OutputServoInfoForLeg(LegIndex, CoxaAngle1[LegIndex], FemurAngle1[LegIndex], TibiaAngle1[LegIndex]);
 #endif      

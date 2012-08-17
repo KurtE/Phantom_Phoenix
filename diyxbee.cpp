@@ -100,7 +100,7 @@ uint8_t ReadFromXBee(uint8_t *pb, uint8_t cb, ulong wTimeout, uint16_t wEOL)
   while (cb) {
     while ((ich = XBeeSerial.read()) == -1) {
       // Call off to the background process if any...
-      g_ServoDriver.BackgroundProcess();
+      DoBackgroundProcess();
       // check for timeout
       if ((uint16_t)(micros()-ulTimeLastChar) > wTimeout) {
 #ifdef DEBUG_VERBOSE                

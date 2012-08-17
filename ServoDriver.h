@@ -40,7 +40,9 @@ class ServoDriver {
     void FreeServos(void);
     
     // Allow for background process to happen...
+#ifdef OPT_BACKGROUND_PROCESS
     void BackgroundProcess(void);
+#endif
     
 #ifdef OPT_TERMINAL_MONITOR  
     void ShowTerminalCommandList(void);
