@@ -235,6 +235,7 @@ extern uint16_t GetXBeeHVal (char c1, char c2);
 //extern uint16_t GetXBeeDL();
 #define GetXBeeMY()			GetXBeeHVal ('M', 'Y')
 #define GetXBeeDL()			GetXBeeHVal ('D', 'L')
+extern void SetXBeeHexVal(char c1, char c2, unsigned long _lval);
 
 // These functions are the ones to actually talk to the hardware.  Should try to make sure
 // all of the other functions talk through these...

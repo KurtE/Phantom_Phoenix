@@ -8,9 +8,9 @@
 #include <Wprogram.h> // Arduino 0022
 #endif
 #include "Hex_Globals.h"
-//#define DEBUG
-//#define DEBUG_OUT
-//#define DEBUG_VERBOSE
+#define DEBUG
+#define DEBUG_OUT
+#define DEBUG_VERBOSE
 
 #include "Hex_Globals.h"
 
@@ -57,9 +57,9 @@ void InitXBee(void)
   // Ok lets set the XBEE into API mode...
 
 
-  delay(250);
+  delay(1000);
   XBeeSerial.write("+++");
-  WaitForXBeeTransmitComplete();
+  XBeeSerial.flush();
 
   // Lets try to get an OK 
   if (ReadFromXBee(abT, sizeof(abT), 100, 13) < 2) {
@@ -67,13 +67,14 @@ void InitXBee(void)
     delay(2000);
     ClearXBeeInputBuffer();      
     XBeeSerial.print("+++");
-    WaitForXBeeTransmitComplete();
+    XBeeSerial.flush();
     ReadFromXBee(abT, sizeof(abT), 2000, 13);  // Wait for it to respond... should probably look at what was returned...
     XBeeSerial.println("ATGT 3");
   }
 
   delay(20);
   XBeeSerial.write("ATAP 1\rATCN\r");
+  ClearXBeeInputBuffer();      
 
   // for Xbee with no flow control, maybe nothing to do here yet...
   g_diystate.fTransReadyRecvd = false;
@@ -82,6 +83,9 @@ void InitXBee(void)
   g_diystate.bPacketNum = 0;
   g_diystate.bTransDataVersion = 0;    // assume old transmitter...
   g_diystate.wDBGDL= 0xffff;          // Debug 
+
+  pinMode(0, OUTPUT);
+
 }
 
 
@@ -99,8 +103,6 @@ uint8_t ReadFromXBee(uint8_t *pb, uint8_t cb, ulong wTimeout, uint16_t wEOL)
 
   while (cb) {
     while ((ich = XBeeSerial.read()) == -1) {
-      // Call off to the background process if any...
-      DoBackgroundProcess();
       // check for timeout
       if ((uint16_t)(micros()-ulTimeLastChar) > wTimeout) {
 #ifdef DEBUG_VERBOSE                
@@ -109,6 +111,8 @@ uint8_t ReadFromXBee(uint8_t *pb, uint8_t cb, ulong wTimeout, uint16_t wEOL)
 #endif                
         return (uint8_t)(pb-pbIn);
       }
+      // Call off to the background process if any...
+      DoBackgroundProcess();
     }
 #ifdef DEBUG_VERBOSE                
     if (g_fDebugOutput) {
@@ -268,7 +272,7 @@ void XBeePlaySounds(uint8_t cNotes, ...)
 //////////////////////////////////////////////////////////////////////////////
 //==============================================================================
 // [APIRecvPacket - try to receive a packet from the XBee. 
-//        - Will return TRUE if it receives something, else false
+//        - Will return The packet length if it receives something, else 0
 //        - Pass in buffer to receive packet.  Assumed it is big enough...
 //        - pass in timeout if zero will return if no data...
 //        
@@ -328,10 +332,10 @@ uint8_t APIRecvPacket(ulong Timeout)
 
 
 //==============================================================================
-// [APISetXbeeHexVal] - Set one of the XBee Hex value registers.
+// [SetXBeeHexVal] - Set one of the XBee Hex value registers.
 //==============================================================================
 
-void APISetXBeeHexVal(char c1, char c2, unsigned long _lval)
+void SetXBeeHexVal(char c1, char c2, unsigned long _lval)
 {
   uint8_t abT[12];
 
@@ -370,7 +374,7 @@ void APISetXBeeHexVal(char c1, char c2, unsigned long _lval)
 //==============================================================================
 void SetXBeeDL (unsigned short wNewDL)
 {
-  APISetXBeeHexVal('D','L', wNewDL);
+  SetXBeeHexVal('D','L', wNewDL);
   g_diystate.wAPIDL = wNewDL;        // remember what DL we are talking to.
 }
 
@@ -399,7 +403,7 @@ void APISendXBeeGetCmd(char c1, char c2)
 
   // last but not least output the checksum
   abT[7] = 0xff - ((8 + g_diystate.bPacketNum + c1 + c2) & 0xff);
-#ifdef DEBUG_VERBOSE
+#ifdef DEBUG_OUTPUT
   if (g_fDebugOutput) {
     DBGSerial.print("ASGC -");
     DBGSerial.write(c1);
@@ -418,15 +422,18 @@ void APISendXBeeGetCmd(char c1, char c2)
 //==============================================================================
 uint16_t GetXBeeHVal (char c1, char c2)
 {
-
+  word wPacketLen;
+  uint16_t wRet;
+  byte b;
   // Output the request command
   APISendXBeeGetCmd(c1, c2);
+  XBeeSerial.flush();
 
   // Now lets loop reading responses 
   for (;;)
   {
 
-    if (!APIRecvPacket(10000))
+    if ((wPacketLen = APIRecvPacket(10000))==0)
       break;
 #ifdef DEBUG_VERBOSE                
     if (g_fDebugOutput) {
@@ -440,8 +447,13 @@ uint16_t GetXBeeHVal (char c1, char c2)
     if ((g_diystate.bAPIPacket[0] == 0x88) && (g_diystate.bAPIPacket[1] == g_diystate.bPacketNum) &&
       (g_diystate.bAPIPacket[4] == 0))
     {
+      wRet = 0;
+      for (b=5; b < wPacketLen; b++) {
+        wRet = (wRet << 8) + g_diystate.bAPIPacket[b];
+      }
+      return wRet;
       // BUGBUG: Why am I using the high 2 bytes if I am only processing words?
-      return     (g_diystate.bAPIPacket[5] << 8) + g_diystate.bAPIPacket[6];
+      //return     (g_diystate.bAPIPacket[5] << 8) + g_diystate.bAPIPacket[6];
     }
   }
   return 0xffff;                // Did not receive the data properly.
@@ -475,15 +487,6 @@ void ClearXBeeInputBuffer(void)
 }
 
 
-
-//==============================================================================
-// [WaitForXBeeTransmitComplete] - This simple helper function will loop waiting
-//                        for the uart to say it is done.
-//==============================================================================
-void WaitForXBeeTransmitComplete(void)
-{
-  XBeeSerial.flush();  // new version buffers...
-}
 
 //==============================================================================
 // [DebugMemoryDump] - striped down version of rprintfMemoryDump
@@ -572,7 +575,7 @@ boolean ReceiveXBeePacket(PDIYPACKET pdiyp)
     if (!cbRead)
       break;                            // Again nothing read?
 
-
+    digitalWrite(0, !digitalRead(0));
 #ifdef DEBUG
     s_fDisplayedTimeout = false;        // say that we got something so we can display empty again...
 #endif

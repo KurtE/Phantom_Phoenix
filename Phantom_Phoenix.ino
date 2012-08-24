@@ -1509,7 +1509,7 @@ void MSound(uint8_t _pin, byte cNotes, ...)
 //==============================================================================
 boolean TerminalMonitor(void)
 {
-  byte szCmdLine[5];  // currently pretty simple command lines...
+  byte szCmdLine[20];  // currently pretty simple command lines...
   byte ich;
   int ch;
   // See if we need to output a prompt.

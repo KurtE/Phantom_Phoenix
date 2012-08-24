@@ -70,7 +70,7 @@ boolean g_fServosFree;    // Are the servos in a free state?
 
 // Some forward references
 extern void MakeSureServosAreOn(void);
-
+extern void DoPyPose(byte *psz);
 
 //--------------------------------------------------------------------
 //Init
@@ -439,6 +439,9 @@ void ServoDriver::ShowTerminalCommandList(void)
   DBGSerial.println(F("M - Toggle Motors on or off"));
   DBGSerial.println(F("F<frame length> - FL in ms"));    // BUGBUG:: 
   DBGSerial.println(F("A - Toggle AX12 speed control"));
+#ifdef OPT_PYPOSE
+  DBGSerial.println(F("P - Pypose"));
+#endif
 #ifdef OPT_FIND_SERVO_OFFSETS
   DBGSerial.println(F("O - Enter Servo offset mode"));
 #endif        
@@ -484,19 +487,23 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
       extern BioloidControllerEx bioloid;
       bioloid.frameLength = bFrame;
     }
-
+  } 
 
 #ifdef OPT_FIND_SERVO_OFFSETS
-  } 
   else if ((bLen == 1) && ((*psz == 'o') || (*psz == 'O'))) {
     FindServoOffsets();
+  }
 #endif
 #ifdef OPT_SSC_FORWARDER
-  } 
   else if ((bLen == 1) && ((*psz == 's') || (*psz == 'S'))) {
     SSCForwarder();
-#endif
   }
+#endif
+#ifdef OPT_PYPOSE
+  else if ((*psz == 'p') || (*psz == 'P')) {
+    DoPyPose(++psz);
+  }
+#endif
 
 }
 #endif    
@@ -529,7 +536,290 @@ void FindServoOffsets()
 }
 #endif  // OPT_FIND_SERVO_OFFSETS
 
+//==============================================================================
+// DoPyPose
+//==============================================================================
+#ifdef OPT_PYPOSE
+#define ARB_SIZE_POSE   7  // also initializes
+#define ARB_LOAD_POSE   8
+#define ARB_LOAD_SEQ    9
+#define ARB_PLAY_SEQ    10
+#define ARB_LOOP_SEQ    11
+#define ARB_TEST        25
+
+
+void DoPyPose(byte *psz)
+{
+  int mode = 0;              // where we are in the frame
+
+  unsigned char id = 0;      // id of this frame
+  unsigned char length = 0;  // length of this frame
+  unsigned char ins = 0;     // instruction of this frame
+
+  unsigned char params[50];  // parameters
+  unsigned char index = 0;   // index in param buffer
+
+  int checksum;              // checksum
+
+    typedef struct{
+    unsigned char pose;    // index of pose to transition to 
+    int time;              // time for transition
+  } 
+  sp_trans_t;
+
+  //  pose and sequence storage
+  int poses[30][30];         // poses [index][servo_id-1]
+  sp_trans_t sequence[50];   // sequence
+  int seqPos;                // step in current sequence
+  word wMY;
+
+  // See if the user gave us a string to process.  If so it should be the XBEE DL to talk to. 
+  // BUGBUG:: if using our XBEE stuff could default to debug terminal... 
+#ifdef USEXBEE
+  if (psz) {
+    word wDL;
+    for (wDL=0; *psz; psz++) {
+      if ((*psz >= '0') && (*psz <= '9'))
+        wDL = (wDL << 4) + *psz - '0';
+      if ((*psz >= 'a') && (*psz <= 'f'))
+        wDL = (wDL << 4) + *psz - 'a' + 10;
+      if ((*psz >= 'A') && (*psz <= 'F'))
+        wDL = (wDL << 4) + *psz - 'A' + 10;
+    }
+    if (wDL)
+      SetXBeeHexVal('D','L', wDL);
+  }
+
+#ifdef DBGSerial
+  wMY = GetXBeeHVal('M', 'Y');
+
+  DBGSerial.print(F("My: "));
+  DBGSerial.println(wMY, HEX);  
+  wMY = GetXBeeHVal('D', 'L');  // I know reused variable...
+  DBGSerial.print(F("PC DL: "));
+  DBGSerial.println(wMY, HEX);
+  DBGSerial.println(F("Exit Terminal and Start Pypose"));
 #endif
+
+  // Also lets exit from API Mode back to text mode...
+  SetXBeeHexVal('G','T', 1000);  // Set the default Guard time
+  SetXBeeHexVal('A','P', 0);    // Exit API mode...
+  delay(2000);
+  while(Serial.read() != -1)
+    ;
+
+#endif    
+
+  // process messages
+  for (;;) {
+    while(Serial.available() > 0){
+      // We need to 0xFF at start of packet
+      if(mode == 0){         // start of new packet
+        if(Serial.read() == 0xff){
+          mode = 2;
+          digitalWrite(0,HIGH-digitalRead(0));
+        }
+        //}else if(mode == 1){   // another start byte
+        //    if(Serial.read() == 0xff)
+        //        mode = 2;
+        //    else
+        //        mode = 0;
+      }
+      else if(mode == 2){   // next byte is index of servo
+        id = Serial.read();    
+        if(id != 0xff)
+          mode = 3;
+      }
+      else if(mode == 3){   // next byte is length
+        length = Serial.read();
+        checksum = id + length;
+        mode = 4;
+      }
+      else if(mode == 4){   // next byte is instruction
+        ins = Serial.read();
+        checksum += ins;
+        index = 0;
+        mode = 5;
+      }
+      else if(mode == 5){   // read data in 
+        params[index] = Serial.read();
+        checksum += (int) params[index];
+        index++;
+        if(index + 1 == length){  // we've read params & checksum
+          mode = 0;
+          if((checksum%256) != 255){ 
+            // return a packet: FF FF id Len Err params=None check
+            Serial.write((byte)0xff);
+            Serial.write((byte)0xff);
+            Serial.write((byte)id);
+            Serial.write((byte)2);
+            Serial.write((byte)64);
+            Serial.write((byte)(255-((66+id)%256)));
+          }
+          else{
+            if(id == 253){
+              // return a packet: FF FF id Len Err params=None check
+              Serial.write((byte)0xff);
+              Serial.write((byte)0xff);
+              Serial.write((byte)id);
+              Serial.write((byte)2);
+              Serial.write((byte)0);
+              Serial.write((byte)(255-((2+id)%256)));
+              // special ArbotiX instructions
+              // Pose Size = 7, followed by single param: size of pose
+              // Load Pose = 8, followed by index, then pose positions (# of param = 2*pose_size)
+              // Load Seq = 9, followed by index/times (# of parameters = 3*seq_size) 
+              // Play Seq = A, no params
+              if(ins == ARB_SIZE_POSE){
+                bioloid.poseSize = params[0];
+                bioloid.readPose();    
+                //Serial.println(bioloid.poseSize);
+              }
+              else if(ins == ARB_LOAD_POSE){
+                int i;    
+                Serial.print("New Pose:");
+                for(i=0; i<bioloid.poseSize; i++){
+                  poses[params[0]][i] = params[(2*i)+1]+(params[(2*i)+2]<<8); 
+                  //Serial.print(poses[params[0]][i]);
+                  //Serial.print(",");     
+                } 
+                Serial.println("");
+              }
+              else if(ins == ARB_LOAD_SEQ){
+                int i;
+                for(i=0;i<(length-2)/3;i++){
+                  sequence[i].pose = params[(i*3)];
+                  sequence[i].time = params[(i*3)+1] + (params[(i*3)+2]<<8);
+                  //Serial.print("New Transition:");
+                  //Serial.print((int)sequence[i].pose);
+                  //Serial.print(" in ");
+                  //Serial.println(sequence[i].time);      
+                }
+              }
+              else if(ins == ARB_PLAY_SEQ){
+                seqPos = 0;
+                while(sequence[seqPos].pose != 0xff){
+                  int i;
+                  int p = sequence[seqPos].pose;
+                  // are we HALT?
+                  if(Serial.read() == 'H') return;
+                  // load pose
+                  for(i=0; i<bioloid.poseSize; i++){
+                    bioloid.setNextPose(i+1,poses[p][i]);
+                  } 
+                  // interpolate
+                  bioloid.interpolateSetup(sequence[seqPos].time);
+                  while(bioloid.interpolating)
+                    bioloid.interpolateStep();
+                  // next transition
+                  seqPos++;
+                }
+              }
+              else if(ins == ARB_LOOP_SEQ){
+                while(1){
+                  seqPos = 0;
+                  while(sequence[seqPos].pose != 0xff){
+                    int i;
+                    int p = sequence[seqPos].pose;
+                    // are we HALT?
+                    if(Serial.read() == 'H') return;
+                    // load pose
+                    for(i=0; i<bioloid.poseSize; i++){
+                      bioloid.setNextPose(i+1,poses[p][i]);
+                    } 
+                    // interpolate
+                    bioloid.interpolateSetup(sequence[seqPos].time);
+                    while(bioloid.interpolating)
+                      bioloid.interpolateStep();
+                    // next transition
+                    seqPos++;
+                  }
+                }
+              }
+              else if(ins == ARB_TEST){
+                int i;
+                // Test Digital I/O
+                for(i=0;i<8;i++){
+                  // test digital
+                  pinMode(i,OUTPUT);
+                  digitalWrite(i,HIGH);  
+                  // test analog
+                  pinMode(31-i,OUTPUT);
+                  digitalWrite(31-i,HIGH);
+
+                  delay(500);
+                  digitalWrite(i,LOW);
+                  digitalWrite(31-i,LOW);
+                }
+                // Test Ax-12
+                for(i=452;i<552;i+=20){
+                  SetPosition(1,i);
+                  delay(200);
+                }
+                delay(1500);
+                // Test Analog I/O
+                for(i=0;i<8;i++){
+                  // test digital
+                  pinMode(i,OUTPUT);
+                  digitalWrite(i,HIGH);  
+                  // test analog
+                  pinMode(31-i,OUTPUT);
+                  digitalWrite(31-i,HIGH);
+
+                  delay(500);
+                  digitalWrite(i,LOW);
+                  digitalWrite(31-i,LOW);
+                }
+              }   
+            }
+            else{
+              int i;
+              // pass thru
+              if(ins == AX_READ_DATA){
+                int i;
+                ax12GetRegister(id, params[0], params[1]);
+                // return a packet: FF FF id Len Err params check
+                if(ax_rx_buffer[3] > 0){
+                  for(i=0;i<ax_rx_buffer[3]+4;i++)
+                    Serial.write(ax_rx_buffer[i]);
+                }
+                ax_rx_buffer[3] = 0;
+              }
+              else if(ins == AX_WRITE_DATA){
+                if(length == 4){
+                  ax12SetRegister(id, params[0], params[1]);
+                }
+                else{
+                  int x = params[1] + (params[2]<<8);
+                  ax12SetRegister2(id, params[0], x);
+                }
+                // return a packet: FF FF id Len Err params check
+                Serial.write((byte)0xff);
+                Serial.write((byte)0xff);
+                Serial.write((byte)id);
+                Serial.write((byte)2);
+                Serial.write((byte)0);
+                Serial.write((byte)(255-((2+id)%256)));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // update joints
+    bioloid.interpolateStep();
+  }
+}
+
+#endif
+
+
+
+#endif
+
+
+
 
 
 
