@@ -76,9 +76,12 @@
 #ifdef USECOMMANDER
 #include <Commander.h>
 //[CONSTANTS]
+#ifdef OPT_GPPLAYER
+  WALKMODE=0, TRANSLATEMODE, ROTATEMODE, GPPLAYERMODE, SINGLELEGMODE, MODECNT};
+#else
 enum {
   WALKMODE=0, TRANSLATEMODE, ROTATEMODE, SINGLELEGMODE, MODECNT};
-
+#endif
 enum {
   NORM_NORM=0, NORM_LONG, HIGH_NORM, HIGH_LONG};
 
@@ -325,6 +328,10 @@ void CommanderInputController::ControlInput(void)
       g_InControlState.BodyRot1.z = (command.walkH);
       g_BodyYShift = (-(command.lookV)/2);
     }
+#ifdef OPT_GPPLAYER
+    if (ControlMode == GPPLAYERMODE) {
+    }
+#endif
 
     //[Single leg functions]
     if (ControlMode == SINGLELEGMODE) {

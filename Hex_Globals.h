@@ -6,9 +6,11 @@
 #ifndef _HEX_GLOBALS_H_
 #define _HEX_GLOBALS_H_
 #include <stdarg.h>
+#include "BioloidEx.h"
 #include "Hex_Cfg.h"
 #include "ServoDriver.h"
 #include "InputController.h"
+#include <EEPROM.h>
 
 #ifdef USEXBEE
 #include "diyxbee.h"

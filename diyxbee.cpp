@@ -8,9 +8,9 @@
 #include <Wprogram.h> // Arduino 0022
 #endif
 #include "Hex_Globals.h"
-#define DEBUG
-#define DEBUG_OUT
-#define DEBUG_VERBOSE
+//#define DEBUG
+//#define DEBUG_OUT
+//#define DEBUG_VERBOSE
 
 #include "Hex_Globals.h"
 

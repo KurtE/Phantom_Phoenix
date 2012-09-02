@@ -177,7 +177,7 @@ DIYSTATE;
 
 #ifdef XBEE_DEBUG_OUTPUT
 // Merge in the Debug stuff here...
-#define XBEE_DEBUG_MAX_OUTPUT 32
+#define XBEE_DEBUG_MAX_OUTPUT 80
 #define XBEE_DEBUG_MAX_INPUT 24
 class XBeeDebugSerial : 
 public Stream
@@ -230,6 +230,7 @@ extern void XBeePlaySounds(uint8_t cNotes, ...);
 //extern void XBeeOutputVal(uint8_t bXbeeVal);
 //extern void XBeeOutputString(char *pString);
 //extern void XBeePlaySounds(uint8_t *pb, uint8_t cb);
+extern void APISendXBeeGetCmd(char c1, char c2);  // use this to send other commands as well
 extern uint16_t GetXBeeHVal (char c1, char c2);
 //extern uint16_t GetXBeeMY();
 //extern uint16_t GetXBeeDL();

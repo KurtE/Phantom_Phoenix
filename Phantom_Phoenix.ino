@@ -1,3 +1,4 @@
+
 #include <ax12.h>
 #include <Commander.h>
 
@@ -28,6 +29,7 @@
 #include <Arduino.h>
 #else
 #endif
+#include <EEPROM.h>
 #include <PS2X_lib.h>
 #include <pins_arduino.h>
 #include "Hex_Globals.h"
@@ -446,6 +448,8 @@ void loop(void)
 #ifdef OPT_GPPLAYER
   //GP Player
   g_ServoDriver.GPPlayer();
+  if (g_ServoDriver.FIsGPSeqActive())
+    return;  // go back to process the next message
 #endif
 
   //Single leg control
@@ -1503,6 +1507,8 @@ void MSound(uint8_t _pin, byte cNotes, ...)
 }
 
 #ifdef OPT_TERMINAL_MONITOR
+extern void DumpEEPROMCmd(byte *pszCmdLine);
+
 //==============================================================================
 // TerminalMonitor - Simple background task checks to see if the user is asking
 //    us to do anything, like update debug levels ore the like.
@@ -1516,6 +1522,7 @@ boolean TerminalMonitor(void)
   if (g_fShowDebugPrompt) {
     DBGSerial.println(F("Arduino Phoenix Monitor"));
     DBGSerial.println(F("D - Toggle debug on or off"));
+    DBGSerial.println(F("E - Dump EEPROM"));
 
     // Let the Servo driver show it's own set of commands...
     g_ServoDriver.ShowTerminalCommandList();
@@ -1549,6 +1556,9 @@ boolean TerminalMonitor(void)
       else
         DBGSerial.println(F("Debug is off"));
     } 
+    else if (((szCmdLine[0] == 'e') || (szCmdLine[0] == 'E'))) {
+      DumpEEPROMCmd(szCmdLine);
+    }
     else
     {
       g_ServoDriver.ProcessTerminalCommand(szCmdLine, ich);
@@ -1558,6 +1568,121 @@ boolean TerminalMonitor(void)
   }
   return false;
 }
+
+//--------------------------------------------------------------------
+// DumpEEPROM
+//--------------------------------------------------------------------
+byte g_bEEPromDumpMode = 0;  // assume mode 0 - hex dump
+word g_wEEPromDumpStart = 0;  // where to start dumps from
+byte g_bEEPromDumpCnt = 16;  // how much to dump at a time
+
+void DumpEEPROM() {
+  byte i;
+  word wDumpCnt = g_bEEPromDumpCnt;
+
+  while (wDumpCnt) {
+    DBGSerial.print(g_wEEPromDumpStart, HEX);
+    DBGSerial.print(" - ");
+
+    // First in Hex
+    for (i = 0; (i < 16) && (i < wDumpCnt); i ++) {
+      byte b;
+      b = EEPROM.read(g_wEEPromDumpStart+i);
+      DBGSerial.print(b, HEX);
+      DBGSerial.print(" ");
+    }
+    // Next in Ascii
+    DBGSerial.print(" : ");
+    for (i = 0; (i < 16) && (i < wDumpCnt); i ++) {
+      byte b;
+      b = EEPROM.read(g_wEEPromDumpStart+i);
+      if ((b > 0x1f) && (b < 0x7f))
+        DBGSerial.write(b);
+      else
+        DBGSerial.print(".");
+    }
+    DBGSerial.println("");
+    g_wEEPromDumpStart += i;  // how many bytes we output
+    wDumpCnt -= i;            // How many more to go...
+  } 
+
+}
+//--------------------------------------------------------------------
+// GetCmdLineNum - passed pointer to pointer so we can update...
+//--------------------------------------------------------------------
+word GetCmdLineNum(byte **ppszCmdLine) {
+  byte *psz = *ppszCmdLine;
+  word w = 0;
+
+  // Ignore any blanks
+  while (*psz == ' ')
+    psz++;
+
+  // See if Hex value passed in
+  if ((*psz == '0') && ((*(psz+1) == 'x') || (*(psz+1) == 'X'))) {
+    // Hex mode
+    psz += 2;  // get over 0x
+    for (;;) {
+      if ((*psz >= '0') && (*psz <= '9'))
+        w = w * 16 + *psz++ - '0';
+      else if ((*psz >= 'a') && (*psz <= 'f'))
+        w = w * 16 + *psz++ - 'a' + 10;
+      else if ((*psz >= 'A') && (*psz <= 'F'))
+        w = w * 16 + *psz++ - 'A' + 10;
+      else
+        break;
+    }
+
+  }
+  else {
+    // decimal mode
+    while ((*psz >= '0') && (*psz <= '9'))
+      w = w * 10 + *psz++ - '0';
+  }
+  *ppszCmdLine = psz;    // update command line pointer
+  return w;
+
+}
+
+//--------------------------------------------------------------------
+// DumpEEPROMCmd
+//--------------------------------------------------------------------
+void DumpEEPROMCmd(byte *pszCmdLine) {
+  // first byte can be H for hex or W for words...
+  if (!*++pszCmdLine)  // Need to get past the command letter first...
+    DumpEEPROM();
+  else if ((*pszCmdLine == 'h') || (*pszCmdLine == 'H')) 
+    g_bEEPromDumpMode = 0;
+  else if ((*pszCmdLine == 'w') || (*pszCmdLine == 'W')) 
+    g_bEEPromDumpMode = 0;
+
+  else {
+    // First argument should be the start location to dump
+    g_wEEPromDumpStart = GetCmdLineNum(&pszCmdLine);
+
+    // If the next byte is an "=" may try to do updates...
+    if (*pszCmdLine == '=') {
+      // make sure we don't get stuck in a loop...
+      byte *psz = pszCmdLine;
+      word w;
+      while (*psz) {
+        w = GetCmdLineNum(&psz);
+        if (psz == pszCmdLine)
+          break;  // not valid stuff so bail!
+        pszCmdLine = psz;  // remember how far we got...
+
+        EEPROM.write(g_wEEPromDumpStart++, w & 0xff);
+      }   
+    }
+    else {
+      if (*pszCmdLine == ' ') { // A blank assume we have a count...
+        g_bEEPromDumpCnt = GetCmdLineNum(&pszCmdLine);
+      }
+    } 
+    DumpEEPROM();
+  }
+}
+
 #endif
 
 //--------------------------------------------------------------------
@@ -1635,6 +1760,11 @@ void AdjustLegPositionsToBodyHeight(void)
 #endif // CNT_HEX_INITS
 
 }
+
+
+
+
+
 
 
 
