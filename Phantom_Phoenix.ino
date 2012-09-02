@@ -1444,12 +1444,81 @@ void CheckAngles(void)
 }
 
 
+//--------------------------------------------------------------------
+// SmoothControl (From Zenta) -  This function makes the body 
+//            rotation and translation much smoother 
+//--------------------------------------------------------------------
+short SmoothControl (short CtrlMoveInp, short CtrlMoveOut, byte CtrlDivider)
+{
+
+  if (CtrlMoveOut < (CtrlMoveInp - 4))
+    return CtrlMoveOut + abs((CtrlMoveOut - CtrlMoveInp)/CtrlDivider);
+  else if (CtrlMoveOut > (CtrlMoveInp + 4))
+    return CtrlMoveOut - abs((CtrlMoveOut - CtrlMoveInp)/CtrlDivider);
+
+  return CtrlMoveInp;
+}
 
 //--------------------------------------------------------------------
-// Why are we faulting?
+// AdjustLegPositionsToBodyHeight() - Will try to adjust the position of the legs
+//     to be appropriate for the current y location of the body...
 //--------------------------------------------------------------------
 
+uint8_t g_iLegInitIndex = 0x00;    // remember which index we are currently using...
 
+void AdjustLegPositionsToBodyHeight(void)
+{
+#ifdef CNT_HEX_INITS
+  // Lets see which of our units we should use...
+  // Note: We will also limit our body height here...
+  if (g_InControlState.BodyPos.y > (short)pgm_read_byte(&g_abHexMaxBodyY[CNT_HEX_INITS-1]))
+    g_InControlState.BodyPos.y =  (short)pgm_read_byte(&g_abHexMaxBodyY[CNT_HEX_INITS-1]);
+
+  uint8_t i;
+  word XZLength1 = pgm_read_byte(&g_abHexIntXZ[CNT_HEX_INITS-1]);
+  for(i = 0; i < (CNT_HEX_INITS-1); i++) {    // Don't need to look at last entry as we already init to assume this one...
+    if (g_InControlState.BodyPos.y <= (short)pgm_read_byte(&g_abHexMaxBodyY[i])) {
+      XZLength1 = pgm_read_byte(&g_abHexIntXZ[i]);
+      break;
+    }
+  }
+  if (i != g_iLegInitIndex) { 
+    g_iLegInitIndex = i;  // remember the current index...
+    //now lets see what happens when we change the leg positions...
+    for (uint8_t LegIndex = 0; LegIndex <= 5; LegIndex++) {
+#ifdef DEBUG
+      if (g_fDebugOutput) {
+        DBGSerial.print("(");
+        DBGSerial.print(LegPosX[LegIndex], DEC);
+        DBGSerial.print(",");
+        DBGSerial.print(LegPosZ[LegIndex], DEC);
+        DBGSerial.print(")->");
+      }
+#endif
+      GetSinCos((short)pgm_read_word(&cCoxaAngle1[LegIndex]));
+      LegPosX[LegIndex] = ((long)((long)cos4 * XZLength1))/c4DEC;  //Set start positions for each leg
+      LegPosZ[LegIndex] = -((long)((long)sin4 * XZLength1))/c4DEC;
+#ifdef DEBUG
+      if (g_fDebugOutput) {
+        DBGSerial.print("(");
+        DBGSerial.print(LegPosX[LegIndex], DEC);
+        DBGSerial.print(",");
+        DBGSerial.print(LegPosZ[LegIndex], DEC);
+        DBGSerial.print(") ");
+      }
+#endif
+    }
+#ifdef DEBUG
+    if (g_fDebugOutput) {
+      DBGSerial.println("");
+    }
+#endif
+    // Make sure we cycle through one gait to have the legs all move into their new locations...
+    g_InControlState.ForceGaitStepCnt = StepsInGait;
+  }
+#endif // CNT_HEX_INITS
+
+}
 
 // BUGBUG:: Move to some library...
 //==============================================================================
@@ -1685,81 +1754,6 @@ void DumpEEPROMCmd(byte *pszCmdLine) {
 
 #endif
 
-//--------------------------------------------------------------------
-// SmoothControl (From Zenta) -  This function makes the body 
-//            rotation and translation much smoother 
-//--------------------------------------------------------------------
-short SmoothControl (short CtrlMoveInp, short CtrlMoveOut, byte CtrlDivider)
-{
-
-  if (CtrlMoveOut < (CtrlMoveInp - 4))
-    return CtrlMoveOut + abs((CtrlMoveOut - CtrlMoveInp)/CtrlDivider);
-  else if (CtrlMoveOut > (CtrlMoveInp + 4))
-    return CtrlMoveOut - abs((CtrlMoveOut - CtrlMoveInp)/CtrlDivider);
-
-  return CtrlMoveInp;
-}
-
-//--------------------------------------------------------------------
-// AdjustLegPositionsToBodyHeight() - Will try to adjust the position of the legs
-//     to be appropriate for the current y location of the body...
-//--------------------------------------------------------------------
-
-uint8_t g_iLegInitIndex = 0x00;    // remember which index we are currently using...
-
-void AdjustLegPositionsToBodyHeight(void)
-{
-#ifdef CNT_HEX_INITS
-  // Lets see which of our units we should use...
-  // Note: We will also limit our body height here...
-  if (g_InControlState.BodyPos.y > (short)pgm_read_byte(&g_abHexMaxBodyY[CNT_HEX_INITS-1]))
-    g_InControlState.BodyPos.y =  (short)pgm_read_byte(&g_abHexMaxBodyY[CNT_HEX_INITS-1]);
-
-  uint8_t i;
-  word XZLength1 = pgm_read_byte(&g_abHexIntXZ[CNT_HEX_INITS-1]);
-  for(i = 0; i < (CNT_HEX_INITS-1); i++) {    // Don't need to look at last entry as we already init to assume this one...
-    if (g_InControlState.BodyPos.y <= (short)pgm_read_byte(&g_abHexMaxBodyY[i])) {
-      XZLength1 = pgm_read_byte(&g_abHexIntXZ[i]);
-      break;
-    }
-  }
-  if (i != g_iLegInitIndex) { 
-    g_iLegInitIndex = i;  // remember the current index...
-    //now lets see what happens when we change the leg positions...
-    for (uint8_t LegIndex = 0; LegIndex <= 5; LegIndex++) {
-#ifdef DEBUG
-      if (g_fDebugOutput) {
-        DBGSerial.print("(");
-        DBGSerial.print(LegPosX[LegIndex], DEC);
-        DBGSerial.print(",");
-        DBGSerial.print(LegPosZ[LegIndex], DEC);
-        DBGSerial.print(")->");
-      }
-#endif
-      GetSinCos((short)pgm_read_word(&cCoxaAngle1[LegIndex]));
-      LegPosX[LegIndex] = ((long)((long)cos4 * XZLength1))/c4DEC;  //Set start positions for each leg
-      LegPosZ[LegIndex] = -((long)((long)sin4 * XZLength1))/c4DEC;
-#ifdef DEBUG
-      if (g_fDebugOutput) {
-        DBGSerial.print("(");
-        DBGSerial.print(LegPosX[LegIndex], DEC);
-        DBGSerial.print(",");
-        DBGSerial.print(LegPosZ[LegIndex], DEC);
-        DBGSerial.print(") ");
-      }
-#endif
-    }
-#ifdef DEBUG
-    if (g_fDebugOutput) {
-      DBGSerial.println("");
-    }
-#endif
-    // Make sure we cycle through one gait to have the legs all move into their new locations...
-    g_InControlState.ForceGaitStepCnt = StepsInGait;
-  }
-#endif // CNT_HEX_INITS
-
-}
 
 
 

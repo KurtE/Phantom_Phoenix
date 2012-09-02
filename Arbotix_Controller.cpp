@@ -26,8 +26,8 @@
 // Quick and Dirty description of controls... WIP
 // In most cases I try to mention what button on the PS2 things coorespond to..
 // On/OFF - Turning the commander 2 on and off (PS2 start button)
-// R1 - options (Change walk gait, Change Leg in Single Leg) (Select on PS2)
-// R2 - Toggle walk method...
+// R1 - options (Change walk gait, Change Leg in Single Leg, Change GP sequence) (Select on PS2)
+// R2 - Toggle walk method...  Run Sequence in GP mode
 // R3 - Walk method (Not done yet) - (PS2 R3)
 // L4 - Ballance mode on and off
 // L5 - Stand/Sit (Triangle on PS2)
@@ -77,7 +77,8 @@
 #include <Commander.h>
 //[CONSTANTS]
 #ifdef OPT_GPPLAYER
-  WALKMODE=0, TRANSLATEMODE, ROTATEMODE, GPPLAYERMODE, SINGLELEGMODE, MODECNT};
+enum {
+  WALKMODE=0, TRANSLATEMODE, ROTATEMODE, SINGLELEGMODE, GPPLAYERMODE, MODECNT};
 #else
 enum {
   WALKMODE=0, TRANSLATEMODE, ROTATEMODE, SINGLELEGMODE, MODECNT};
@@ -165,6 +166,7 @@ void CommanderInputController::Init(void)
   g_BodyYOffset = 0;
   g_BodyYShift = 0;
   command.begin(38400);
+  GPSeq = 0;  // init to something...
 
   ControlMode = WALKMODE;
   HeightSpeedMode = NORM_NORM;
@@ -205,6 +207,9 @@ void CommanderInputController::ControlInput(void)
       else {
         MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, 
       }
+      if (ControlMode != SINGLELEGMODE)
+        g_InControlState.SelectedLeg=255;
+
     }
 
     //[Common functions]
@@ -329,9 +334,27 @@ void CommanderInputController::ControlInput(void)
       g_BodyYShift = (-(command.lookV)/2);
     }
 #ifdef OPT_GPPLAYER
+    //[GPPlayer functions]
     if (ControlMode == GPPLAYERMODE) {
+      //Switch between sequences
+      if ((command.buttons & BUT_R1) && !(buttonsPrev & BUT_R1)) {
+        if (!g_ServoDriver.FIsGPSeqActive() ) {
+          if (GPSeq < 5) {  //Max sequence
+            MSound (SOUND_PIN, 1, 50, 1500);  //sound SOUND_PIN, [50\3000]
+            GPSeq = GPSeq+1;
+          } 
+          else {
+            MSound (SOUND_PIN, 2, 50, 2000, 50, 2250);//Sound SOUND_PIN,[50\4000, 50\4500]
+            GPSeq=0;
+          }
+        }
+      }
+      //Start Sequence
+      if ((command.buttons & BUT_R2) && !(buttonsPrev & BUT_R2)) {
+        g_ServoDriver.GPStartSeq(GPSeq);
+      }
     }
-#endif
+#endif // OPT_GPPLAYER
 
     //[Single leg functions]
     if (ControlMode == SINGLELEGMODE) {
@@ -399,6 +422,8 @@ void CommanderTurnRobotOff(void)
 
 
 #endif //USEPS2
+
+
 
 
 

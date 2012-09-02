@@ -568,6 +568,7 @@ void ServoDriver::ShowTerminalCommandList(void)
   DBGSerial.println(F("M - Toggle Motors on or off"));
   DBGSerial.println(F("F<frame length> - FL in ms"));    // BUGBUG:: 
   DBGSerial.println(F("A - Toggle AX12 speed control"));
+  DBGSerial.println(F("T - Test Servos"));
 #ifdef OPT_PYPOSE
   DBGSerial.println(F("P<DL PC> - Pypose"));
 #endif
@@ -594,6 +595,18 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
 
     return true;  
   } 
+
+  if ((bLen == 1) && ((*psz == 't') || (*psz == 'T'))) {
+    // Test to see if all servos are responding...
+    for(int i=1;i<=NUMSERVOS;i++){
+      word w;
+      w = ax12GetRegister(i,AX_PRESENT_POSITION_L,2);
+      DBGSerial.print(i,DEC);
+      DBGSerial.print(F("="));
+      DBGSerial.println(w, DEC);
+      delay(25);   
+    }
+  }
 
   if ((bLen == 1) && ((*psz == 'a') || (*psz == 'A'))) {
     g_fAXSpeedControl = !g_fAXSpeedControl;
@@ -664,6 +677,16 @@ void FindServoOffsets()
 
 }
 #endif  // OPT_FIND_SERVO_OFFSETS
+
+//==============================================================================
+// EEPromReadData - Quick and dirty function to read multiple bytes in from
+//  eeprom...
+//==============================================================================
+void EEPROMReadData(word wStart, uint8_t *pv, byte cnt) {
+  while (cnt--) {
+    *pv++ = EEPROM.read(wStart++);
+  }
+}
 
 //==============================================================================
 // DoPyPose - This is based off of the Pypose sketch...
@@ -981,13 +1004,7 @@ void DoPyPose(byte *psz)
   }
 }
 
-// set up some format to save out sequences to the EEPROM...
 
-void EEPROMReadData(word wStart, uint8_t *pv, byte cnt) {
-  while (cnt--) {
-    *pv++ = EEPROM.read(wStart++);
-  }
-}
 
 void EEPROMWriteData(word wStart, uint8_t *pv, byte cnt) {
   while (cnt--) {
@@ -1080,6 +1097,7 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
 
 
 #endif
+
 
 
 
