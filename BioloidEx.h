@@ -58,6 +58,7 @@ class BioloidControllerEx
     int getCurPose(int id);                     // get a servo value in the current pose
     int getNextPose(int id);                    // get a servo value in the next pose
     void setNextPose(int id, int pos);          // set a servo value in the next pose
+    void setNextPoseByIndex(int index, int pos);  // set a servo value by index for next pose
     void setId(int index, int id);              // set the id of a particular storage index
     int getId(int index);                       // get the id of a particular storage index
     

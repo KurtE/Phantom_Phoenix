@@ -58,6 +58,7 @@ extern INCONTROLSTATE   g_InControlState;		 // State information that controller
 //-----------------------------------------------------------------------------
 extern boolean          g_fDebugOutput;
 extern boolean          g_fEnableServos;      // Hack to allow me to turn servo processing off...
+extern boolean          g_fRobotUpsideDown;    // Is the robot upside down?
 
 
 extern void MSound(uint8_t _pin, byte cNotes, ...);

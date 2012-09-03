@@ -298,7 +298,7 @@ boolean         fWalking;            //  True if the robot are walking
 byte            bExtraCycle;          // Forcing some extra timed cycles for avoiding "end of gait bug"
 #define         cGPlimit 2           // GP=GaitPos testing different limits
 
-boolean        fRobotUpsideDown;    // Is the robot upside down?
+boolean        g_fRobotUpsideDown;    // Is the robot upside down?
 boolean        fRobotUpsideDownPrev;
 //=============================================================================
 // Function prototypes
@@ -392,7 +392,7 @@ void setup(){
   pinMode(A4, OUTPUT);
 #endif    
 #ifdef OPT_WALK_UPSIDE_DOWN
-  fRobotUpsideDown = false; //Assume off... 
+  g_fRobotUpsideDown = false; //Assume off... 
 #ifdef DBGSerial  
   DBGSerial.println(IsRobotUpsideDown, DEC);
 #endif  
@@ -422,12 +422,12 @@ void loop(void)
 
 #ifdef IsRobotUpsideDown
     if (!fWalking){// dont do this while walking
-    fRobotUpsideDown = IsRobotUpsideDown;    // Grab the current state of the robot... 
-    if (fRobotUpsideDown != fRobotUpsideDownPrev) {
+    g_fRobotUpsideDown = IsRobotUpsideDown;    // Grab the current state of the robot... 
+    if (g_fRobotUpsideDown != fRobotUpsideDownPrev) {
       // Double check to make sure that it was not a one shot error
-      fRobotUpsideDown = IsRobotUpsideDown;    // Grab the current state of the robot... 
-      if (fRobotUpsideDown != fRobotUpsideDownPrev) {
-        fRobotUpsideDownPrev = fRobotUpsideDown;
+      g_fRobotUpsideDown = IsRobotUpsideDown;    // Grab the current state of the robot... 
+      if (g_fRobotUpsideDown != fRobotUpsideDownPrev) {
+        fRobotUpsideDownPrev = g_fRobotUpsideDown;
 #ifdef DGBSerial        
         DBGSerial.println(fRobotUpsideDownPrev, DEC);
 #endif        
@@ -437,7 +437,7 @@ void loop(void)
   //  DBGSerial.println(analogRead(0), DEC);
 #endif
 #ifdef OPT_WALK_UPSIDE_DOWN
-  if (fRobotUpsideDown){
+  if (g_fRobotUpsideDown){
     g_InControlState.TravelLength.x = -g_InControlState.TravelLength.x;
     g_InControlState.BodyPos.x = -g_InControlState.BodyPos.x;
     g_InControlState.SLLeg.x = -g_InControlState.SLLeg.x;
@@ -517,7 +517,7 @@ void loop(void)
     LegPosZ[LegIndex]+g_InControlState.BodyPos.z-BodyFKPosZ+GaitPosZ[LegIndex] - TotalTransZ, LegIndex);
   }
 #ifdef OPT_WALK_UPSIDE_DOWN
-  if (fRobotUpsideDown){ //Need to set them back for not messing with the SmoothControl
+  if (g_fRobotUpsideDown){ //Need to set them back for not messing with the SmoothControl
     g_InControlState.BodyPos.x = -g_InControlState.BodyPos.x;
     g_InControlState.SLLeg.x = -g_InControlState.SLLeg.x;
     g_InControlState.BodyRot1.z = -g_InControlState.BodyRot1.z;
@@ -1263,7 +1263,7 @@ void BodyFK (short PosX, short PosZ, short PosY, short RotationY, byte BodyIKLeg
   CosB4 = cos4;
 
 #ifdef OPT_WALK_UPSIDE_DOWN
-  if (fRobotUpsideDown)
+  if (g_fRobotUpsideDown)
     GetSinCos (-g_InControlState.BodyRot1.y+(-RotationY*c1DEC)+TotalYBal1) ;
   else
     GetSinCos (g_InControlState.BodyRot1.y+(RotationY*c1DEC)+TotalYBal1) ;
@@ -1378,7 +1378,7 @@ void LegIK (short IKFeetPosX, short IKFeetPosY, short IKFeetPosZ, byte LegIKLegN
   IKA24 = GetArcCos (T3 );
   //IKFemurAngle
 #ifdef OPT_WALK_UPSIDE_DOWN
-  if (fRobotUpsideDown)
+  if (g_fRobotUpsideDown)
     FemurAngle1[LegIKLegNr] = (long)(IKA14 + IKA24) * 180 / 3141 - 900 + CFEMURHORNOFFSET1(LegIKLegNr);//Inverted, up side down
   else
     FemurAngle1[LegIKLegNr] = -(long)(IKA14 + IKA24) * 180 / 3141 + 900 + CFEMURHORNOFFSET1(LegIKLegNr);//Normal
@@ -1391,7 +1391,7 @@ void LegIK (short IKFeetPosX, short IKFeetPosY, short IKFeetPosZ, byte LegIKLegN
   Temp2 = (2*(byte)pgm_read_byte(&cFemurLength[LegIKLegNr])*(byte)pgm_read_byte(&cTibiaLength[LegIKLegNr]));
   GetArcCos (Temp1 / Temp2);
 #ifdef OPT_WALK_UPSIDE_DOWN
-  if (fRobotUpsideDown)
+  if (g_fRobotUpsideDown)
     TibiaAngle1[LegIKLegNr] = (1800-(long)AngleRad4*180/3141);//Full range tibia, wrong side (up side down)
   else
     TibiaAngle1[LegIKLegNr] = -(1800-(long)AngleRad4*180/3141);//Full range tibia, right side (up side up)

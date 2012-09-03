@@ -194,6 +194,8 @@ byte g_bSeqStepNum;
 word g_wSeqHeaderStart;
 boolean g_fSeqProgmem;
 transition_t *g_ptransCur;    // pointer to our current transisiton...
+
+boolean fRobotUpsideDownGPStart;  // state when we start sequence
 #ifdef USE_PYPOSE_HEADER
 #define CNT_PYPOSE_SEGS (sizeof(PoseList)/sizeof(PoseList[0]))
 #else
@@ -248,12 +250,14 @@ void ServoDriver::GPStartSeq(uint8_t iSeq)
   _fGPActive = true;
   _iSeq = iSeq;
   g_bSeqStepNum = 0xff;  // Say that we are not in a step yet...
-
+  fRobotUpsideDownGPStart = g_fRobotUpsideDown;
 }
 
 //--------------------------------------------------------------------
 //[GP PLAYER]
 //--------------------------------------------------------------------
+static const byte cPinIndexTranslateUpsideDownTable[] PROGMEM = {0x80+1, 0x80+0, 3, 2, 5, 4, 0x80+7, 0x80+6, 9, 8, 11, 10, 0x80+13, 0x80+12, 15, 14, 17, 16}; 
+
 void ServoDriver::GPPlayer(void)
 {
   EEPROMPoseSeq eepps;
@@ -275,8 +279,27 @@ void ServoDriver::GPPlayer(void)
 #ifdef USE_PYPOSE_HEADER
     if (g_fSeqProgmem) {
       g_ptransCur++;  // lets point to the next step entry.
+
       word *pwPose = (word*)pgm_read_word(&(g_ptransCur->pose));
-      bioloid.loadPose(pwPose);
+
+      int poseSize = pgm_read_word_near(pwPose); // number of servos in this pose
+
+      if (!fRobotUpsideDownGPStart) {
+        for(int i=0; i<poseSize; i++) {
+          bioloid.setNextPoseByIndex(i, pgm_read_word_near(pwPose+1+i));  // set a servo value by index for next pose
+        }
+      }
+      else {
+        // Upside down 
+        byte iUpsideDown;
+        for(int i=0; i<poseSize; i++) {
+          iUpsideDown = pgm_read_byte(&cPinIndexTranslateUpsideDownTable[i]);
+          if (iUpsideDown & 0x80)
+            bioloid.setNextPoseByIndex(iUpsideDown&0x7f, 1023-pgm_read_word_near(pwPose+1+i));  
+          else
+            bioloid.setNextPoseByIndex(iUpsideDown, pgm_read_word_near(pwPose+1+i));  
+        }
+      }
       // interpolate
       bioloid.interpolateSetup(pgm_read_word(&(g_ptransCur->time)));
       return;
@@ -1097,6 +1120,9 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
 
 
 #endif
+
+
+
 
 
 
