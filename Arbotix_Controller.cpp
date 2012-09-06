@@ -98,6 +98,7 @@ enum {
 //=============================================================================
 Commander command = Commander();
 unsigned long g_ulLastMsgTime;
+short  g_sGPSMController;    // What GPSM value have we calculated. 0xff - Not used yet
 
 #ifdef USEMULTI
 //==============================================================================
@@ -151,7 +152,6 @@ static byte    buttonsPrev;
 static byte    extPrev;
 
 // some external or forward function references.
-extern void MSound(uint8_t _pin, byte cNotes, ...);
 extern void CommanderTurnRobotOff(void);
 
 //==============================================================================
@@ -202,10 +202,10 @@ void CommanderInputController::ControlInput(void)
     if ((command.buttons & BUT_LT) && !(buttonsPrev & BUT_LT)) {
       if (++ControlMode >= MODECNT) {
         ControlMode = WALKMODE;    // cycled back around...
-        MSound(SOUND_PIN, 2, 50, 2000, 50, 3000);  //sound SOUND_PIN, 
+        MSound( 2, 50, 2000, 50, 3000); 
       } 
       else {
-        MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, 
+        MSound( 1, 50, 2000);  
       }
       if (ControlMode != SINGLELEGMODE)
         g_InControlState.SelectedLeg=255;
@@ -217,10 +217,10 @@ void CommanderInputController::ControlInput(void)
     if ((command.buttons & BUT_L4) && !(buttonsPrev & BUT_L4)) {
       g_InControlState.BalanceMode = !g_InControlState.BalanceMode;
       if (g_InControlState.BalanceMode) {
-        MSound(SOUND_PIN, 1, 250, 1500);  //sound SOUND_PIN, [250\3000]
+        MSound( 1, 250, 1500); 
       } 
       else {
-        MSound(SOUND_PIN, 2, 100, 2000, 50, 4000);
+        MSound( 2, 100, 2000, 50, 4000);
       }
     }
 
@@ -248,13 +248,13 @@ void CommanderInputController::ControlInput(void)
           g_InControlState.SpeedControl += dspeed;
         else 
           g_InControlState.SpeedControl = 0;
-        MSound(SOUND_PIN, 1, 50, 1000+g_InControlState.SpeedControl);  //sound SOUND_PIN, [50\4000]
+        MSound( 1, 50, 1000+g_InControlState.SpeedControl);  
       }
       if ((dspeed > 0) && (g_InControlState.SpeedControl < 2000)) {
         g_InControlState.SpeedControl += dspeed;
         if (g_InControlState.SpeedControl > 2000)
           g_InControlState.SpeedControl = 2000;
-        MSound(SOUND_PIN, 1, 50, 1000+g_InControlState.SpeedControl);  //sound SOUND_PIN, [50\4000]
+        MSound( 1, 50, 1000+g_InControlState.SpeedControl); 
       }
 
       command.lookH = 0; // don't walk when adjusting the speed here...
@@ -269,10 +269,10 @@ void CommanderInputController::ControlInput(void)
         && abs(g_InControlState.TravelLength.y*2)<cTravelDeadZone  ) {
         g_InControlState.GaitType = g_InControlState.GaitType+1;                    // Go to the next gait...
         if (g_InControlState.GaitType<NUM_GAITS) {                 // Make sure we did not exceed number of gaits...
-          MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound( 1, 50, 2000);  
         } 
         else {
-          MSound (SOUND_PIN, 2, 50, 2000, 50, 2250); 
+          MSound (2, 50, 2000, 50, 2250); 
           g_InControlState.GaitType = 0;
         }
         GaitSelect();
@@ -280,7 +280,7 @@ void CommanderInputController::ControlInput(void)
 
       //Double leg lift height
       if ((command.buttons & BUT_RT) && !(buttonsPrev & BUT_RT)) {
-        MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound( 1, 50, 2000);  
         HeightSpeedMode = (HeightSpeedMode + 1) & 0x3; // wrap around mode
         DoubleTravelOn = HeightSpeedMode & 0x1;
         if ( HeightSpeedMode & 0x2)
@@ -291,7 +291,7 @@ void CommanderInputController::ControlInput(void)
 
       // Switch between Walk method 1 && Walk method 2
       if ((command.buttons & BUT_R2) && !(buttonsPrev & BUT_R2)) {
-        MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound (1, 50, 2000);
         WalkMethod = !WalkMethod;
       }
 
@@ -336,23 +336,47 @@ void CommanderInputController::ControlInput(void)
 #ifdef OPT_GPPLAYER
     //[GPPlayer functions]
     if (ControlMode == GPPLAYERMODE) {
+      // Lets try some speed control... Map all values if we have mapped some before
+      // or start mapping if we exceed some minimum delta from center
+      // Have to keep reminding myself that commander library already subtracted 128...
+      if (g_ServoDriver.FIsGPSeqActive() ) {
+        if ((g_sGPSMController != 32767)  
+          || (command.lookV > 16) || (command.lookV < -16))
+        {
+          // We are in speed modify mode...
+          if (command.lookV >= 0)
+            g_sGPSMController = map(command.lookV, 0, 127, 0, 200);
+          else  
+            g_sGPSMController = map(command.lookV, -127, 0, -200, 0);
+          g_ServoDriver.GPSetSpeedMultiplyer(g_sGPSMController);
+        }
+      }
+
       //Switch between sequences
       if ((command.buttons & BUT_R1) && !(buttonsPrev & BUT_R1)) {
         if (!g_ServoDriver.FIsGPSeqActive() ) {
           if (GPSeq < 5) {  //Max sequence
-            MSound (SOUND_PIN, 1, 50, 1500);  //sound SOUND_PIN, [50\3000]
+            MSound (1, 50, 1500);  
             GPSeq = GPSeq+1;
           } 
           else {
-            MSound (SOUND_PIN, 2, 50, 2000, 50, 2250);//Sound SOUND_PIN,[50\4000, 50\4500]
+            MSound (2, 50, 2000, 50, 2250);
             GPSeq=0;
           }
         }
       }
       //Start Sequence
       if ((command.buttons & BUT_R2) && !(buttonsPrev & BUT_R2)) {
-        g_ServoDriver.GPStartSeq(GPSeq);
+        if (!g_ServoDriver.FIsGPSeqActive() ) {
+          g_ServoDriver.GPStartSeq(GPSeq);
+          g_sGPSMController = 32767;  // Say that we are not in Speed modify mode yet... valid ranges are 50-200 (both postive and negative... 
+        }
+        else {
+          g_ServoDriver.GPStartSeq(0xff);    // tell the GP system to abort if possible...
+            MSound (2, 50, 2000, 50, 2000);
+        }
       }
+
     }
 #endif // OPT_GPPLAYER
 
@@ -360,7 +384,7 @@ void CommanderInputController::ControlInput(void)
     if (ControlMode == SINGLELEGMODE) {
       //Switch leg for single leg control
       if ((command.buttons & BUT_R1) && !(buttonsPrev & BUT_R1)) {
-        MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound (1, 50, 2000);  
         if (g_InControlState.SelectedLeg<5)
           g_InControlState.SelectedLeg = g_InControlState.SelectedLeg+1;
         else
@@ -373,7 +397,7 @@ void CommanderInputController::ControlInput(void)
 
       // Hold single leg in place
       if ((command.buttons & BUT_RT) && !(buttonsPrev & BUT_RT)) {
-        MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound (1, 50, 2000);  
         g_InControlState.fSLHold = !g_InControlState.fSLHold;
       }
     }
@@ -422,6 +446,9 @@ void CommanderTurnRobotOff(void)
 
 
 #endif //USEPS2
+
+
+
 
 
 

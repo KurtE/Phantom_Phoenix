@@ -27,8 +27,11 @@ class ServoDriver {
     inline boolean  FIsGPEnabled(void) {return _fGPEnabled;};
     boolean         FIsGPSeqDefined(uint8_t iSeq);
     inline boolean  FIsGPSeqActive(void) {return _fGPActive;};
-    void            GPStartSeq(uint8_t iSeq);
+    void            GPStartSeq(uint8_t iSeq);  // 0xff - says to abort...
     void            GPPlayer(void);
+    uint8_t         GPNumSteps(void);          // How many steps does the current sequence have
+    uint8_t         GPCurStep(void);           // Return which step currently on... 
+    void            GPSetSpeedMultiplyer(short sm) ;      // Set the Speed multiplier (100 is default)
 #endif
     void BeginServoUpdate(void);    // Start the update 
 #ifdef c4DOF
@@ -54,7 +57,8 @@ class ServoDriver {
 #ifdef OPT_GPPLAYER    
     boolean _fGPEnabled;     // IS GP defined for this servo driver?
     boolean _fGPActive;      // Is a sequence currently active - May change later when we integrate in sequence timing adjustment code
-    uint8_t    _iSeq;        // current sequence we are running
+    uint8_t  _iSeq;          // current sequence we are running
+    short    _sGPSM;        // Speed multiplier +-200 
 #endif
 
 } ;   

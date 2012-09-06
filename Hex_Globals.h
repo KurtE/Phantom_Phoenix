@@ -61,7 +61,7 @@ extern boolean          g_fEnableServos;      // Hack to allow me to turn servo 
 extern boolean          g_fRobotUpsideDown;    // Is the robot upside down?
 
 
-extern void MSound(uint8_t _pin, byte cNotes, ...);
+extern void MSound(byte cNotes, ...);
 extern boolean CheckVoltage(void);
 
 void AdjustLegPositionsToBodyHeight(void);

@@ -533,7 +533,7 @@ void loop(void)
   //Drive Servos
   if (g_InControlState.fHexOn) {
     if (g_InControlState.fHexOn && !g_InControlState.fPrev_HexOn) {
-      MSound(SOUND_PIN, 3, 60, 2000, 80, 2250, 100, 2500);
+      MSound(3, 60, 2000, 80, 2250, 100, 2500);
 #ifdef USEXBEE
       XBeePlaySounds(3, 60, 2000, 80, 2250, 100, 2500);
 #endif            
@@ -636,7 +636,7 @@ void loop(void)
       ServoMoveTime = 600;
       StartUpdateServos();
       g_ServoDriver.CommitServoDriver(ServoMoveTime);
-      MSound(SOUND_PIN, 3, 100, 2500, 80, 2250, 60, 2000);
+      MSound(3, 100, 2500, 80, 2250, 60, 2000);
 #ifdef USEXBEE            
       XBeePlaySounds(3, 100, 2500, 80, 2250, 60, 2000);
 #endif            
@@ -746,7 +746,7 @@ boolean CheckVoltage() {
 #ifdef DBGSerial
       DBGSerial.println(Voltage, DEC);
 #endif          
-      MSound(SOUND_PIN, 1, 45, 2000);
+      MSound( 1, 45, 2000);
     }
     delay(2000);
   }
@@ -1525,7 +1525,8 @@ void AdjustLegPositionsToBodyHeight(void)
 //    SoundNoTimer - Quick and dirty tone function to try to output a frequency
 //            to a speaker for some simple sounds.
 //==============================================================================
-void SoundNoTimer(uint8_t _pin, unsigned long duration,  unsigned int frequency)
+#ifdef SOUND_PIN
+void SoundNoTimer(unsigned long duration,  unsigned int frequency)
 {
 #ifdef __AVR__
   volatile uint8_t *pin_port;
@@ -1538,10 +1539,10 @@ void SoundNoTimer(uint8_t _pin, unsigned long duration,  unsigned int frequency)
   long lusDelayPerHalfCycle;
 
   // Set the pinMode as OUTPUT
-  pinMode(_pin, OUTPUT);
+  pinMode(SOUND_PIN, OUTPUT);
 
-  pin_port = portOutputRegister(digitalPinToPort(_pin));
-  pin_mask = digitalPinToBitMask(_pin);
+  pin_port = portOutputRegister(digitalPinToPort(SOUND_PIN));
+  pin_mask = digitalPinToBitMask(SOUND_PIN);
 
   toggle_count = 2 * frequency * duration / 1000;
   lusDelayPerHalfCycle = 1000000L/(frequency * 2);
@@ -1558,7 +1559,7 @@ void SoundNoTimer(uint8_t _pin, unsigned long duration,  unsigned int frequency)
 
 }
 
-void MSound(uint8_t _pin, byte cNotes, ...)
+void MSound(byte cNotes, ...)
 {
   va_list ap;
   unsigned int uDur;
@@ -1568,12 +1569,16 @@ void MSound(uint8_t _pin, byte cNotes, ...)
   while (cNotes > 0) {
     uDur = va_arg(ap, unsigned int);
     uFreq = va_arg(ap, unsigned int);
-    if (_pin != 0xff)
-      SoundNoTimer(_pin, uDur, uFreq);
+    SoundNoTimer(uDur, uFreq);
     cNotes--;
   }
   va_end(ap);
 }
+#else
+void MSound(byte cNotes, ...)
+{
+};
+#endif
 
 #ifdef OPT_TERMINAL_MONITOR
 extern void DumpEEPROMCmd(byte *pszCmdLine);
@@ -1753,6 +1758,7 @@ void DumpEEPROMCmd(byte *pszCmdLine) {
 }
 
 #endif
+
 
 
 

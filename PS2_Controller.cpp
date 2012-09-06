@@ -106,10 +106,10 @@ static byte        ControlMode;
 static bool        DoubleHeightOn;
 static bool        DoubleTravelOn;
 static bool        WalkMethod;
-byte            GPSeq;             //Number of the sequence
+byte               GPSeq;             //Number of the sequence
+short              g_sGPSMController;    // What GPSM value have we calculated. 0xff - Not used yet
 
 // some external or forward function references.
-extern void MSound(uint8_t _pin, byte cNotes, ...);
 extern void PS2TurnRobotOff(void);
 
 //==============================================================================
@@ -146,7 +146,7 @@ void InputController::Init(void)
 //==============================================================================
 void InputController::AllowControllerInterrupts(boolean fAllow)
 {
-// We don't need to do anything...
+  // We don't need to do anything...
 }
 
 //==============================================================================
@@ -181,7 +181,7 @@ void InputController::ControlInput(void)
 
       //Translate mode
       if (ps2x.ButtonPressed(PSB_L1)) {// L1 Button Test
-        MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound( 1, 50, 2000);  
         if (ControlMode != TRANSLATEMODE )
           ControlMode = TRANSLATEMODE;
         else {
@@ -194,7 +194,7 @@ void InputController::ControlInput(void)
 
       //Rotate mode
       if (ps2x.ButtonPressed(PSB_L2)) {    // L2 Button Test
-        MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound( 1, 50, 2000);
         if (ControlMode != ROTATEMODE)
           ControlMode = ROTATEMODE;
         else {
@@ -209,7 +209,6 @@ void InputController::ControlInput(void)
       if (ps2x.ButtonPressed(PSB_CIRCLE)) {// O - Circle Button Test
         if (abs(g_InControlState.TravelLength.x)<cTravelDeadZone && abs(g_InControlState.TravelLength.z)<cTravelDeadZone 
           && abs(g_InControlState.TravelLength.y*2)<cTravelDeadZone )   {
-          //Sound SOUND_PIN,[50\4000]
           if (ControlMode != SINGLELEGMODE) {
             ControlMode = SINGLELEGMODE;
             if (g_InControlState.SelectedLeg == 255)  //Select leg if none is selected
@@ -225,7 +224,7 @@ void InputController::ControlInput(void)
 #ifdef OPT_GPPLAYER
       // GP Player Mode X
       if (ps2x.ButtonPressed(PSB_CROSS)) { // X - Cross Button Test
-        MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+        MSound(1, 50, 2000);  
         if (ControlMode != GPPLAYERMODE) {
           ControlMode = GPPLAYERMODE;
           GPSeq=0;
@@ -240,10 +239,10 @@ void InputController::ControlInput(void)
       if (ps2x.ButtonPressed(PSB_SQUARE)) { // Square Button Test
         g_InControlState.BalanceMode = !g_InControlState.BalanceMode;
         if (g_InControlState.BalanceMode) {
-          MSound(SOUND_PIN, 1, 250, 1500);  //sound SOUND_PIN, [250\3000]
+          MSound(1, 250, 1500); 
         } 
         else {
-          MSound(SOUND_PIN, 2, 100, 2000, 50, 4000);
+          MSound( 2, 100, 2000, 50, 4000);
         }
       }
 
@@ -278,14 +277,14 @@ void InputController::ControlInput(void)
       if (ps2x.ButtonPressed(PSB_PAD_RIGHT)) { // D-Right - Button Test
         if (g_InControlState.SpeedControl>0) {
           g_InControlState.SpeedControl = g_InControlState.SpeedControl - 50;
-          MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound( 1, 50, 2000);  
         }
       }
 
       if (ps2x.ButtonPressed(PSB_PAD_LEFT)) { // D-Left - Button Test
         if (g_InControlState.SpeedControl<2000 ) {
           g_InControlState.SpeedControl = g_InControlState.SpeedControl + 50;
-          MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound( 1, 50, 2000); 
         }
       }
 
@@ -298,10 +297,10 @@ void InputController::ControlInput(void)
           && abs(g_InControlState.TravelLength.y*2)<cTravelDeadZone  ) {
           g_InControlState.GaitType = g_InControlState.GaitType+1;                    // Go to the next gait...
           if (g_InControlState.GaitType<NUM_GAITS) {                 // Make sure we did not exceed number of gaits...
-            MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+            MSound( 1, 50, 2000); 
           } 
           else {
-            MSound (SOUND_PIN, 2, 50, 2000, 50, 2250); 
+            MSound(2, 50, 2000, 50, 2250); 
             g_InControlState.GaitType = 0;
           }
           GaitSelect();
@@ -309,7 +308,7 @@ void InputController::ControlInput(void)
 
         //Double leg lift height
         if (ps2x.ButtonPressed(PSB_R1)) { // R1 Button Test
-          MSound(SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound( 1, 50, 2000); 
           DoubleHeightOn = !DoubleHeightOn;
           if (DoubleHeightOn)
             g_InControlState.LegLiftHeight = 80;
@@ -319,13 +318,13 @@ void InputController::ControlInput(void)
 
         //Double Travel Length
         if (ps2x.ButtonPressed(PSB_R2)) {// R2 Button Test
-          MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound(1, 50, 2000); 
           DoubleTravelOn = !DoubleTravelOn;
         }
 
         // Switch between Walk method 1 && Walk method 2
         if (ps2x.ButtonPressed(PSB_R3)) { // R3 Button Test
-          MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound(1, 50, 2000); 
           WalkMethod = !WalkMethod;
         }
 
@@ -367,7 +366,7 @@ void InputController::ControlInput(void)
       if (ControlMode == SINGLELEGMODE) {
         //Switch leg for single leg control
         if (ps2x.ButtonPressed(PSB_SELECT)) { // Select Button Test
-          MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound(1, 50, 2000); 
           if (g_InControlState.SelectedLeg<5)
             g_InControlState.SelectedLeg = g_InControlState.SelectedLeg+1;
           else
@@ -380,7 +379,7 @@ void InputController::ControlInput(void)
 
         // Hold single leg in place
         if (ps2x.ButtonPressed(PSB_R2)) { // R2 Button Test
-          MSound (SOUND_PIN, 1, 50, 2000);  //sound SOUND_PIN, [50\4000]
+          MSound(1, 50, 2000);  
           g_InControlState.fSLHold = !g_InControlState.fSLHold;
         }
       }
@@ -389,27 +388,53 @@ void InputController::ControlInput(void)
       //[GPPlayer functions]
       if (ControlMode == GPPLAYERMODE) {
 
+        // Lets try some speed control... Map all values if we have mapped some before
+        // or start mapping if we exceed some minimum delta from center
+        // Have to keep reminding myself that commander library already subtracted 128...
+        if (g_ServoDriver.FIsGPSeqActive() ) {
+          if ((g_sGPSMController != 32767)  
+            || (ps2x.Analog(PSS_RY) > (128+16)) || (ps2x.Analog(PSS_RY) < (128-16)))
+          {
+            // We are in speed modify mode...
+            short sNewGPSM = map(ps2x.Analog(PSS_RY), 0, 255, -200, 200);
+            if (sNewGPSM != g_sGPSMController) {
+              g_sGPSMController = sNewGPSM;
+              g_ServoDriver.GPSetSpeedMultiplyer(g_sGPSMController);
+            }
+
+          }
+        }
+
         //Switch between sequences
         if (ps2x.ButtonPressed(PSB_SELECT)) { // Select Button Test
           if (!g_ServoDriver.FIsGPSeqActive() ) {
             if (GPSeq < 5) {  //Max sequence
-              MSound (SOUND_PIN, 1, 50, 1500);  //sound SOUND_PIN, [50\3000]
+              MSound(1, 50, 1500);
               GPSeq = GPSeq+1;
             } 
             else {
-              MSound (SOUND_PIN, 2, 50, 2000, 50, 2250);//Sound SOUND_PIN,[50\4000, 50\4500]
+              MSound(2, 50, 2000, 50, 2250);
               GPSeq=0;
             }
           }
         }
         //Start Sequence
         if (ps2x.ButtonPressed(PSB_R2))// R2 Button Test
-          g_ServoDriver.GPStartSeq(GPSeq);
+          if (!g_ServoDriver.FIsGPSeqActive() ) {
+            g_ServoDriver.GPStartSeq(GPSeq);
+            g_sGPSMController = 32767;  // Say that we are not in Speed modify mode yet... valid ranges are 50-200 (both postive and negative... 
+          }
+          else {
+            g_ServoDriver.GPStartSeq(0xff);    // tell the GP system to abort if possible...
+            MSound (2, 50, 2000, 50, 2000);
+          }
+
+
       }
 #endif // OPT_GPPLAYER
 
       //Calculate walking time delay
-            g_InControlState.InputTimeDelay = 128 - max(max(abs(ps2x.Analog(PSS_LX) - 128), abs(ps2x.Analog(PSS_LY) - 128)), abs(ps2x.Analog(PSS_RX) - 128));
+      g_InControlState.InputTimeDelay = 128 - max(max(abs(ps2x.Analog(PSS_LX) - 128), abs(ps2x.Analog(PSS_LY) - 128)), abs(ps2x.Analog(PSS_RX) - 128));
     }
 
     //Calculate g_InControlState.BodyPos.y
@@ -451,6 +476,8 @@ void PS2TurnRobotOff(void)
 
 
 #endif //USEPS2
+
+
 
 
 

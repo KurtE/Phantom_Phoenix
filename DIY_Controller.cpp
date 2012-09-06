@@ -77,13 +77,13 @@ extern "C" {
   const char s_sGN5[] PROGMEM = "Wave 24";
   const char s_sGN6[] PROGMEM = "Tripod 6";
   PGM_P s_asGateNames[] PROGMEM = {
-    s_sGN1, s_sGN2, s_sGN3, s_sGN4, s_sGN5, s_sGN6  };
+    s_sGN1, s_sGN2, s_sGN3, s_sGN4, s_sGN5, s_sGN6        };
 
   const char s_sLJUDN1[] PROGMEM = "LJOYUD walk";
   const char s_sLJUDN2[] PROGMEM = "LJOYUD trans";
   const char s_sLJUDN3[] PROGMEM = "SetRotOffset";
   PGM_P s_asLJoyUDNames[] PROGMEM = {
-    s_sLJUDN1, s_sLJUDN2, s_sLJUDN3  };
+    s_sLJUDN1, s_sLJUDN2, s_sLJUDN3        };
   //static const char  *s_asLJoyUDNames[] = {"LJOYUD walk", "LJOYUD trans", "SetRotOffset"};
 }
 static unsigned        g_BodyYOffset; 
@@ -94,6 +94,9 @@ byte                  LjoyUDFunction = 0;		// For setting different options/func
 boolean               LockFunction = false;		// If True the actual function are freezed
 boolean               LeftJoyLRmode = false;      
 boolean               g_fDisplayLiPo;            // Should we display the lipo information?
+
+static short          g_sGPSMController;
+static byte           g_bGPCurStepPrev;
 #ifdef USEPS2
 byte        g_bWhichControl;  // Which input device are we currently using?
 #define     WC_UNKNOWN  0      // Not sure yet
@@ -249,27 +252,27 @@ void DIYXBeeController::ControlInput(void)
 
     if (g_InControlState.fHexOn) {
       if ((g_diyp.s.wButtons & (1<<0xa)) && ((g_diypPrev.s.wButtons & (1<<0xa)) == 0)) { // A button test 
-        MSound (SOUND_PIN, 1, 50, 2000);
+        MSound(1, 50, 2000);
         XBeePlaySounds(1, 50, 2000);
         bXBeeControlMode = WALKMODE;
         XBeeOutputStringF(F("Walking"));
       }
 
       if ((g_diyp.s.wButtons & (1<<0xb)) && ((g_diypPrev.s.wButtons & (1<<0xb)) == 0)) { // B button test
-        MSound (SOUND_PIN, 1, 50, 2000);
+        MSound(1, 50, 2000);
         XBeePlaySounds(1, 50, 2000);
         bXBeeControlMode = TRANSLATEMODE;
         XBeeOutputStringF(F("Body Translate"));
       }
 
       if ((g_diyp.s.wButtons & (1<<0xc)) && ((g_diypPrev.s.wButtons & (1<<0xc)) == 0)) { // C button test
-        MSound (SOUND_PIN, 1, 50, 2000);
+        MSound(1, 50, 2000);
         bXBeeControlMode = ROTATEMODE;
         XBeeOutputStringF(F("Body Rotate"));
       }
 
       if ((g_diyp.s.wButtons & (1<<0xD)) && ((g_diypPrev.s.wButtons & (1<<0xd)) == 0)) { // D button test - Single Leg
-        MSound (SOUND_PIN, 1, 50, 2000);
+        MSound(1, 50, 2000);
         if (g_InControlState.SelectedLeg==255) // none
           g_InControlState.SelectedLeg=cRF;
         else if (bXBeeControlMode==SINGLELEGMODE) //Double press to turn all legs down
@@ -280,13 +283,13 @@ void DIYXBeeController::ControlInput(void)
       if ((g_diyp.s.wButtons & (1<<0xe)) && ((g_diypPrev.s.wButtons & (1<<0xe)) == 0)) { // E button test - Balance mode
         if (!g_InControlState.BalanceMode) {
           g_InControlState.BalanceMode = 1;
-          MSound(SOUND_PIN, 2, 100, 2000, 50, 4000);
+          MSound( 2, 100, 2000, 50, 4000);
           XBeePlaySounds(2, 100, 2000, 50, 4000);
           XBeeOutputStringF(F("Balance On"));
         } 
         else {
           g_InControlState.BalanceMode = 0;
-          MSound(SOUND_PIN, 1, 250, 1500);
+          MSound( 1, 250, 1500);
           XBeePlaySounds(1, 50, 1500);
           XBeeOutputStringF(F("Balance Off"));
         }
@@ -296,7 +299,7 @@ void DIYXBeeController::ControlInput(void)
       if ((g_diyp.s.wButtons & (1<<0xf)) && ((g_diypPrev.s.wButtons & (1<<0xf)) == 0)) { // F button test - GP Player
         if (g_ServoDriver.FIsGPEnabled()) {   //F Button GP Player Mode Mode on/off -- SSC supports this mode
           XBeeOutputStringF(F("Run Sequence"));
-          MSound (SOUND_PIN, 1, 50, 2000);
+          MSound(1, 50, 2000);
 
           g_InControlState.BodyPos.x = 0;
           g_InControlState.BodyPos.z = 0;
@@ -314,7 +317,7 @@ void DIYXBeeController::ControlInput(void)
         } 
         else {
           XBeeOutputStringF(F("Seq Disabled"));
-          MSound (SOUND_PIN, 1, 50, 2000);
+          MSound(1, 50, 2000);
         }
       }
 #endif   
@@ -338,7 +341,7 @@ void DIYXBeeController::ControlInput(void)
         if ( abs(g_InControlState.TravelLength.x)<cTravelDeadZone &&  abs(g_InControlState.TravelLength.z)<cTravelDeadZone &&  
           abs(g_InControlState.TravelLength.y*2)<cTravelDeadZone)  {
           //Switch Gait type
-          MSound(SOUND_PIN, 1, 50, 2000);   //Sound P9, [50\4000]
+          MSound( 1, 50, 2000);   //Sound P9, [50\4000]
           g_InControlState.GaitType = iNumButton-1;
 #ifdef DEBUG
           DBGPrintf("New Gate: %d\n\r", g_InControlState.GaitType);
@@ -354,13 +357,13 @@ void DIYXBeeController::ControlInput(void)
       //Switch single leg
       if (bXBeeControlMode==SINGLELEGMODE) {
         if (iNumButton>=1 && iNumButton<=6) {
-          MSound(SOUND_PIN, 1, 50, 2000);   //Sound P9, [50\4000]
+          MSound( 1, 50, 2000);   //Sound P9, [50\4000]
           g_InControlState.SelectedLeg = iNumButton-1;
           g_InControlState.fSLHold=0;
         }
 
         if (iNumButton == 9) {  //Switch Directcontrol
-          MSound(SOUND_PIN, 1, 50, 2000);   //Sound P9, [50\4000]
+          MSound( 1, 50, 2000);   //Sound P9, [50\4000]
           g_InControlState.fSLHold ^= 1;    //Toggle g_InControlState.fSLHold
         }
 
@@ -375,10 +378,10 @@ void DIYXBeeController::ControlInput(void)
         g_InControlState.BodyPos.y = SmoothControl((g_diyp.s.bMSlider / 2), g_InControlState.BodyPos.y, SmDiv);
       else if (g_diystate.cbPacketSize > PKT_LPOT)
         g_InControlState.BodyPos.y =  SmoothControl((g_diyp.s.bLPot*2/3), g_InControlState.BodyPos.y, SmDiv);//Zenta test
-        
+
       else
         g_InControlState.BodyPos.y =  SmoothControl((g_diyp.s.bLJoyUD / 2), g_InControlState.BodyPos.y, SmDiv);
-        
+
 
       //Leg lift height - Right slider has value 0-255 translate to 30-93
       g_InControlState.LegLiftHeight = 30 + g_diyp.s.bRSlider/3;//Zenta trying 3 instead of 4
@@ -433,39 +436,39 @@ void DIYXBeeController::ControlInput(void)
       if (bXBeeControlMode==ROTATEMODE) {
         if (iNumButton &&(iNumButton <=3)) {
           LjoyUDFunction = iNumButton -1;
-          MSound(SOUND_PIN, 1, 20, 2000); 
+          MSound( 1, 20, 2000); 
           XBeeOutputStringF((const __FlashStringHelper *)pgm_read_word(&s_asLJoyUDNames[LjoyUDFunction]));
         }
         if (iNumButton == 4) {  // Toogle Left Joystick left/Right function
           LeftJoyLRmode = !LeftJoyLRmode;
           if (LeftJoyLRmode) {
             XBeeOutputStringF(F("LJOYLR trans"));
-            MSound(SOUND_PIN, 1, 20, 1000); 
+            MSound( 1, 20, 1000); 
           } 
           else {
             XBeeOutputStringF(F("LJOYLR rotate"));
-            MSound(SOUND_PIN, 1, 20, 2000); 
+            MSound( 1, 20, 2000); 
           }
         }
 #ifdef DISP_VOLTAGE
         if (iNumButton == 8) {  // Toogle g_fDisplayLiPo
           g_fDisplayLiPo = !g_fDisplayLiPo;
-          MSound(SOUND_PIN, 1, 20, 1500+500*g_fDisplayLiPo); 
+          MSound( 1, 20, 1500+500*g_fDisplayLiPo); 
         }
 #endif 
         if (iNumButton == 9) {  // Toogle LockFunction
           LockFunction = !LockFunction;
           if (LockFunction) {
             XBeeOutputStringF(F("Lock ON"));
-            MSound(SOUND_PIN, 1, 20, 1500); 
+            MSound( 1, 20, 1500); 
           } 
           else {
             XBeeOutputStringF(F("Lock OFF"));
-            MSound(SOUND_PIN, 1, 20, 2500); 
+            MSound( 1, 20, 2500); 
           }
         }
-        
-        
+
+
         // BranchLJoyUDFunction in basic
         switch (LjoyUDFunction) {
         case 0:
@@ -491,7 +494,7 @@ void DIYXBeeController::ControlInput(void)
         g_InControlState.BodyRot1.z  = SmoothControl((-(g_diyp.s.bRJoyLR-128)*2), g_InControlState.BodyRot1.z , SmDiv);
 
         g_InControlState.InputTimeDelay = 128 - abs(g_diyp.s.bLJoyUD-128) + (128 -(g_diyp.s.bLSlider)/2);
-        
+
       }
 
       //---------------------------------------------------------------------------------------------------
@@ -508,17 +511,54 @@ void DIYXBeeController::ControlInput(void)
       // Sequence General Player Mode
       //---------------------------------------------------------------------------------------------------
 #ifdef OPT_GPPLAYER
-      if (bXBeeControlMode == GPPLAYERMODE && iNumButton>=1 && iNumButton<=9) { //1-9 Button Play GP Seq
-        word wGPSeqPtr;
-        if (!g_ServoDriver.FIsGPSeqActive() ) {
-          uint8_t GPSeq = iNumButton-1;
+      if (bXBeeControlMode == GPPLAYERMODE) { 
+        // Lets try some speed control... Map all values if we have mapped some before
+        // or start mapping if we exceed some minimum delta from center
+        // Have to keep reminding myself that commander library already subtracted 128...
+        if (g_ServoDriver.FIsGPSeqActive() ) {
+          if ((g_sGPSMController != 32767)  
+            || (g_diyp.s.bRJoyUD > (128+16)) || (g_diyp.s.bRJoyUD < (128-16)))
+          {
+            // We are in speed modify mode...
+            short sNewGPSM = map(g_diyp.s.bRJoyUD, 0, 255, -200, 200);
+            if (sNewGPSM != g_sGPSMController) {
+              g_sGPSMController = sNewGPSM;
+              g_ServoDriver.GPSetSpeedMultiplyer(g_sGPSMController);
+            }
+          }
+          
+          // See what step we are on, if it changed then output the step to the user
+          byte bCurStep = g_ServoDriver.GPCurStep();
+          if (bCurStep != g_bGPCurStepPrev) {
+            g_bGPCurStepPrev = bCurStep;
+            
+            // Lets build a quick and dirty string to output
+            char szTemp[20];
+            sprintf(szTemp, "cs: %d SM: %d", bCurStep, (g_sGPSMController == 32767) ? 100 : g_sGPSMController);
+            XBeeOutputString(szTemp);
+          }
+          
+        }
 
-          if ( g_ServoDriver.FIsGPSeqDefined(GPSeq)) {
-            XBeeOutputStringF(F("Start Sequence"));  // Tell user sequence started.
-            g_ServoDriver.GPStartSeq(GPSeq);
-          }  
+        if (iNumButton>=1 && iNumButton<=9) { //1-9 Button Play GP Seq
+          word wGPSeqPtr;
+          if (!g_ServoDriver.FIsGPSeqActive() ) {
+            uint8_t GPSeq = iNumButton-1;
+
+            if ( g_ServoDriver.FIsGPSeqDefined(GPSeq)) {
+              XBeeOutputStringF(F("Start Sequence"));  // Tell user sequence started.
+              g_ServoDriver.GPStartSeq(GPSeq);
+              g_sGPSMController = 32767;    // Say we are not in modifiy speed modifier mode yet...
+              g_bGPCurStepPrev = 0xff;
+            }  
+            else {
+              XBeeOutputStringF(F("Seq Not defined"));  // that sequence was not defined...
+            }
+          }
           else {
-            XBeeOutputStringF(F("Seq Not defined"));  // that sequence was not defined...
+            // Cancel the current one
+            g_ServoDriver.GPStartSeq(0xff);    // tell the GP system to abort if possible...
+            MSound (2, 50, 2000, 50, 2000);
           }
         }
       }
@@ -532,7 +572,7 @@ void DIYXBeeController::ControlInput(void)
     // Not a valid packet - we should go to a turned off state as to not walk into things!
     if (g_InControlState.fHexOn && (g_diystate.fPacketForced ))  {
       // Turn off
-      //   MSound (SOUND_PIN, 4, 100,2500, 80, 2250, 100, 2500, 60, 20000); // play it a little different...
+      //   MSound(4, 100,2500, 80, 2250, 100, 2500, 60, 20000); // play it a little different...
 
       //Turn off
       g_InControlState.BodyPos.x = 0;
@@ -566,5 +606,8 @@ void DIYXBeeController::ControlInput(void)
 }
 
 #endif //USEXBEE
+
+
+
 
 

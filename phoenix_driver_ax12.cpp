@@ -244,25 +244,35 @@ boolean ServoDriver::FIsGPSeqDefined(uint8_t iSeq)
 //--------------------------------------------------------------------
 void ServoDriver::GPStartSeq(uint8_t iSeq)
 {
+  if ((iSeq == 0xff) && _fGPActive) {
+    // Caller is asking us to abort... 
+    // I think I can simply clear our active flag and it will cleanup...
+    // May need to find a way to clear the interpolating...
+    _fGPActive = false;
+    return;
+  }
   // Use our Validate function to get the initial stuff set up...
   if (!FIsGPSeqDefined(iSeq))
     return;
   _fGPActive = true;
   _iSeq = iSeq;
   g_bSeqStepNum = 0xff;  // Say that we are not in a step yet...
+  _sGPSM = 100;          // assume we are running at standard speed
   fRobotUpsideDownGPStart = g_fRobotUpsideDown;
 }
 
 //--------------------------------------------------------------------
 //[GP PLAYER]
 //--------------------------------------------------------------------
-static const byte cPinIndexTranslateUpsideDownTable[] PROGMEM = {0x80+1, 0x80+0, 3, 2, 5, 4, 0x80+7, 0x80+6, 9, 8, 11, 10, 0x80+13, 0x80+12, 15, 14, 17, 16}; 
+static const byte cPinIndexTranslateUpsideDownTable[] PROGMEM = {
+  0x80+1, 0x80+0, 3, 2, 5, 4, 0x80+7, 0x80+6, 9, 8, 11, 10, 0x80+13, 0x80+12, 15, 14, 17, 16}; 
 
 void ServoDriver::GPPlayer(void)
 {
   EEPROMPoseSeq eepps;
   byte bServo;
   word wPosePos;
+  byte bServoIndexUpsideDown;
 
   if (_fGPActive) {
     // See if we are still interpolating the last step
@@ -271,9 +281,19 @@ void ServoDriver::GPPlayer(void)
       return;
     }
 
-    if (++g_bSeqStepNum >= g_eepph.bCntSteps) {
-      _fGPActive = false;  // we are done
-      return;
+    if (_sGPSM >= 0) {
+      if (++g_bSeqStepNum >= g_eepph.bCntSteps) {
+        _fGPActive = false;  // we are done
+        return;
+      }
+    }
+    else {
+      // Run in reverse
+      if ((g_bSeqStepNum == 0xff) || g_bSeqStepNum == 0) {
+        _fGPActive = false;  // we are done
+        return;
+      }
+      g_bSeqStepNum--;
     }
 
 #ifdef USE_PYPOSE_HEADER
@@ -284,24 +304,23 @@ void ServoDriver::GPPlayer(void)
 
       int poseSize = pgm_read_word_near(pwPose); // number of servos in this pose
 
-      if (!fRobotUpsideDownGPStart) {
-        for(int i=0; i<poseSize; i++) {
-          bioloid.setNextPoseByIndex(i, pgm_read_word_near(pwPose+1+i));  // set a servo value by index for next pose
+        if (!fRobotUpsideDownGPStart) {
+        for(bServo=0; bServo<poseSize; bServo++) {
+          bioloid.setNextPoseByIndex(bServo, pgm_read_word_near(pwPose+1+bServo));  // set a servo value by index for next pose
         }
       }
       else {
         // Upside down 
-        byte iUpsideDown;
-        for(int i=0; i<poseSize; i++) {
-          iUpsideDown = pgm_read_byte(&cPinIndexTranslateUpsideDownTable[i]);
-          if (iUpsideDown & 0x80)
-            bioloid.setNextPoseByIndex(iUpsideDown&0x7f, 1023-pgm_read_word_near(pwPose+1+i));  
+        for(bServo=0; bServo<poseSize; bServo++) {
+          bServoIndexUpsideDown = pgm_read_byte(&cPinIndexTranslateUpsideDownTable[bServo]);
+          if (bServoIndexUpsideDown & 0x80)
+            bioloid.setNextPoseByIndex(bServoIndexUpsideDown&0x7f, 1023-pgm_read_word_near(pwPose+1+bServo));  
           else
-            bioloid.setNextPoseByIndex(iUpsideDown, pgm_read_word_near(pwPose+1+i));  
+            bioloid.setNextPoseByIndex(bServoIndexUpsideDown, pgm_read_word_near(pwPose+1+bServo));  
         }
       }
-      // interpolate
-      bioloid.interpolateSetup(pgm_read_word(&(g_ptransCur->time)));
+      // interpolate - Note: we want to take the Speed multipler into account here. 
+      bioloid.interpolateSetup(((long)pgm_read_word(&(g_ptransCur->time))*100)/abs(_sGPSM));
       return;
     }
 #endif
@@ -312,14 +331,48 @@ void ServoDriver::GPPlayer(void)
     word wEEPromPoseLoc = g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntPoses*sizeof(EEPROMPoseSeq)) + (eepps.bPoseNum * sizeof(word) * 18);  // should not hard code 18
     for (bServo=0; bServo < 18; bServo++) {
       EEPROMReadData(wEEPromPoseLoc, (uint8_t*)&wPosePos, sizeof(wPosePos));
-      bioloid.setNextPose(bServo+1,wPosePos);
+      if (!fRobotUpsideDownGPStart) {
+        bioloid.setNextPoseByIndex(bServo, wPosePos);  // set a servo value by index for next pose
+      }
+      else {
+        bServoIndexUpsideDown = pgm_read_byte(&cPinIndexTranslateUpsideDownTable[bServo]);
+        if (bServoIndexUpsideDown & 0x80)
+          bioloid.setNextPoseByIndex(bServoIndexUpsideDown&0x7f, 1023-wPosePos);  
+        else
+          bioloid.setNextPoseByIndex(bServoIndexUpsideDown, wPosePos);  
+      }        
+      //      bioloid.setNextPose(bServo+1,wPosePos);
       wEEPromPoseLoc += sizeof(word);
     }
 
     // interpolate
-    bioloid.interpolateSetup(eepps.wTime);
+    bioloid.interpolateSetup((((long)eepps.wTime)*100)/abs(_sGPSM));
   }
 }
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+uint8_t ServoDriver::GPNumSteps(void)          // How many steps does the current sequence have
+{
+  return _fGPActive ? g_eepph.bCntSteps : 0;
+}
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+uint8_t ServoDriver::GPCurStep(void)           // Return which step currently on... 
+{
+  return _fGPActive ? g_bSeqStepNum + 1 : 0xff;
+}
+
+//------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
+void ServoDriver::GPSetSpeedMultiplyer(short sm)      // Set the Speed multiplier (100 is default)
+{
+  _sGPSM = sm;
+}
+
+
+
 #endif // OPT_GPPLAYER
 
 //------------------------------------------------------------------------------------------
@@ -1120,6 +1173,11 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
 
 
 #endif
+
+
+
+
+
 
 
 
