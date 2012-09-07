@@ -298,7 +298,11 @@ void ServoDriver::GPPlayer(void)
 
 #ifdef USE_PYPOSE_HEADER
     if (g_fSeqProgmem) {
-      g_ptransCur++;  // lets point to the next step entry.
+
+      if (_sGPSM >= 0) 
+        g_ptransCur++;  // lets point to the next step entry.
+      else
+        g_ptransCur--;  // lets point to the next step entry.
 
       word *pwPose = (word*)pgm_read_word(&(g_ptransCur->pose));
 
@@ -1173,6 +1177,7 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
 
 
 #endif
+
 
 
 
