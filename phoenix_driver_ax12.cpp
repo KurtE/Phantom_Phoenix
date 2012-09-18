@@ -1,8 +1,8 @@
 //====================================================================
 //Project Lynxmotion Phoenix
 //
-// Servo Driver - This version is setup to use the SSC-32 to control
-// the servos.
+// Servo Driver - This version is setup to use AX-12 type servos using the
+// Arbotix AX12 and bioloid libraries (which may have been updated)
 //====================================================================
 #if ARDUINO>99
 #include <Arduino.h> // Arduino 1.0
@@ -57,7 +57,6 @@ word      g_awGoalAXPos[NUMSERVOS];
 //=============================================================================
 // Global - Local to this file only...
 //=============================================================================
-//Servo Pin numbers - May be SSC-32 or actual pins on main controller, depending on configuration.
 static const byte cPinTable[] PROGMEM = {
   cRRCoxaPin,  cRMCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLMCoxaPin,  cLFCoxaPin, 
   cRRFemurPin, cRMFemurPin, cRFFemurPin, cLRFemurPin, cLMFemurPin, cLFFemurPin,

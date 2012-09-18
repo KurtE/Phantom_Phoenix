@@ -29,7 +29,9 @@ This is controlled in the code by the option (OPT_WALK_UPSIDE_DOWN).  As part of
 needed a way to detect which way is up.  We used one of these: http://www.lynxmotion.com/p-606-lynxmotion-buffered-2g-accelerometer.aspx
 More details up on this page of the thread: http://forums.trossenrobotics.com/showthread.php?5429-Thinking-about-trying-out-a-different-Hex-robot.../page18
 
-Note: There is a Sneak Peak Video by Zenta on Page 19 of the thread!
+Zenta has done a couple of different videos showing the PhantomX including:
+http://www.youtube.com/watch?v=byzP9QiFadI&feature=channel&list=UL
+http://www.youtube.com/watch?feature=player_embedded&v=rAeQn5QnyXo#!
 
 We have code in place to try to detect when the battery voltage gets too low as to try to minimize 
 the risk of damaging the battery.  There are a couple versions voltage detection in the code.  
@@ -53,10 +55,12 @@ Currently we have the PhantomX running using a few different Input controllers.
 The main one I have been playing with is a XBee DIY remote control that a few of us have.  
 More details up on the thread: http://www.lynxmotion.net/viewtopic.php?f=21&t=5447
 
-We have also done some testing using a Lynxmotion PS2 controller (http://www.lynxmotion.com/p-552-ps2-robot-controller.aspx)
+I also have it working using the Input code for the Arbotix Robot Controller 2.  The code should work with the default
+controller code, however I am running mine with my own updated version of the controller code.  This code can be found up on 
+github\kurte\CommanderEx.  The top of the source file (Arbotix_Controller.cpp) describes how I am currently using the different 
+buttons and joysticks for the different functions. 
 
-We are currently working on the Input code for the Arbotix Robot Controller 2, 
-which most of the PhantomX users are currently using the with original PhantomX software. 
+We have also done some testing using a Lynxmotion PS2 controller (http://www.lynxmotion.com/p-552-ps2-robot-controller.aspx)
 
 The Source File Hex_Cfg.h, is the main place that you need to go to change which controller to use and other options 
 that the program uses. 

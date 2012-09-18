@@ -445,7 +445,7 @@ void CommanderTurnRobotOff(void)
 }
 
 
-#endif //USEPS2
+#endif //USECOMMANDER
 
 
 
