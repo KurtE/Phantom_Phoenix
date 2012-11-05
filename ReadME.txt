@@ -1,9 +1,15 @@
+Note: Currently this is not the project that I am currently do most of my work in to support my Hex Robots.  I do most of my work, in 
+the Arduino_Phoenix_Parts project.  In that project there are several different libraries, to build the Phoenix code for any of my Hex robots.  The top
+library is the Phoenix and under this are several example projects that can create several different configurations, including one that is 
+hopefully always set up for a stock PhantomX robot.
+
 Note:  Everything in this repository  is a Work In Progress (WIP), there are no 
 warranties or guarantees of any kind.   Use at your own risk!  However I hope some 
 of you have fun with it!
 
 This folder contains the source code for Lynxmotion Phoenix code that has been adapted
 to the Arbotix PhantomX robot sold by Trossen Robotics (http://www.trossenrobotics.com/c/phantomx-hexapod-kits.aspx)
+
 
 The original Phoenix code was written by Jeroen Janssen [aka Xan] to run on the Lynxmotion Phoenix 
 (http://www.lynxmotion.com/c-117-phoenix.aspx). It was originally written in Basic for the Basic Atom Pro 28
