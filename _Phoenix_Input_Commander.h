@@ -72,9 +72,6 @@
 #else
 #include <Wprogram.h> // Arduino 0022
 #endif
-#include "Hex_Globals.h"
-#ifdef USECOMMANDER
-#include <Commander.h>
 //[CONSTANTS]
 #ifdef OPT_GPPLAYER
 enum {
@@ -89,8 +86,78 @@ enum {
 
 #define cTravelDeadZone 4      //The deadzone for the analog input from the remote
 
-#define ARBOTIX_TO  1000        // if we don't get a valid message in this number of mills turn off
+#define ARBOTIX_TO  1250        // if we don't get a valid message in this number of mills turn off
 
+#ifndef XBeeSerial
+SoftwareSerial XBeeSerial(cXBEE_IN, cXBEE_OUT);
+#endif
+
+//=============================================================================
+// I have included a modified version of the commander object here as I wish to
+// decouple the usage of the joysticks from the names as well as on other robots
+// I may not be using Serial as the the serial port I am communicating with
+// So I also removed the Southpaw code.
+//=============================================================================
+/*
+  Commander.h - Library for interfacing with ArbotiX Commander
+ Copyright (c) 2009-2012 Michael E. Ferguson.  All right reserved.
+ 
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ 
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ 
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
+/* bitmasks for buttons array */
+#define BUT_R1      0x01
+#define BUT_R2      0x02
+#define BUT_R3      0x04
+#define BUT_L4      0x08
+#define BUT_L5      0x10
+#define BUT_L6      0x20
+#define BUT_RT      0x40
+#define BUT_LT      0x80
+
+#ifndef MAX_BODY_Y
+#define MAX_BODY_Y 100
+#endif
+
+
+/* the Commander will send out a frame at about 30hz, this class helps decipher the output. */
+class Commander
+{    
+public:
+  Commander(); 
+  void begin(unsigned long baud);
+  int ReadMsgs();         // must be called regularly to clean out Serial buffer
+
+  // joystick values are -125 to 125
+  signed char rightV;      // vertical stick movement = forward speed
+  signed char rightH;      // horizontal stick movement = sideways or angular speed
+  signed char leftV;      // vertical stick movement = tilt    
+  signed char leftH;      // horizontal stick movement = pan (when we run out of pan, turn body?)
+
+  // buttons are 0 or 1 (PRESSED), and bitmapped
+  unsigned char buttons;  // 
+  unsigned char ext;      // Extended function set
+
+    // Hooks are used as callbacks for button presses -- NOT IMPLEMENT YET
+
+private:
+  // internal variables used for reading messages
+  unsigned char vals[7];  // temporary values, moved after we confirm checksum
+  int index;              // -1 = waiting for new packet
+  int checksum;
+};
 
 
 //=============================================================================
@@ -99,7 +166,7 @@ enum {
 Commander command = Commander();
 unsigned long g_ulLastMsgTime;
 short  g_sGPSMController;    // What GPSM value have we calculated. 0xff - Not used yet
-
+boolean g_fDynamicLegXZLength = false;  // Has the user dynamically adjusted the Leg XZ init pos (width)
 #ifdef USEMULTI
 //==============================================================================
 //
@@ -165,7 +232,7 @@ void CommanderInputController::Init(void)
 {
   g_BodyYOffset = 0;
   g_BodyYShift = 0;
-  command.begin(38400);
+  command.begin(XBEE_BAUD);
   GPSeq = 0;  // init to something...
 
   ControlMode = WALKMODE;
@@ -194,7 +261,14 @@ void CommanderInputController::ControlInput(void)
   // See if we have a new command available...
   if(command.ReadMsgs() > 0){
     // If we receive a valid message than turn robot on...
-    g_InControlState.fHexOn = true;
+    boolean fAdjustLegPositions = false;
+    short sLegInitXZAdjust = 0;
+    short sLegInitAngleAdjust = 0;
+    
+    if (!g_InControlState.fRobotOn ) {
+        g_InControlState.fRobotOn = true;
+        fAdjustLegPositions = true;
+    }
 
     // [SWITCH MODES]
 
@@ -230,36 +304,57 @@ void CommanderInputController::ControlInput(void)
         g_BodyYOffset = 0;
       else
         g_BodyYOffset = 35;
+      fAdjustLegPositions = true;
+      g_fDynamicLegXZLength = false;
     }
 
     // We will use L6 with the Right joystick to control both body offset as well as Speed...
     // We move each pass through this by a percentage of how far we are from center in each direction
     // We get feedback with height by seeing the robot move up and down.  For Speed, I put in sounds
     // which give an idea, but only for those whoes robot has a speaker
+    int rx = command.rightH;
+    int ry = command.rightV;
+
     if (command.buttons & BUT_L6 ) {
       // raise or lower the robot on the joystick up /down
       // Maybe should have Min/Max
-      g_BodyYOffset += command.lookV/25;
-
+      int delta = command.leftV/25;   
+      if (delta) {
+        g_BodyYOffset = max(min(g_BodyYOffset + delta, MAX_BODY_Y), 0);
+        fAdjustLegPositions = true;
+      }
+      
+      // Also use right Horizontal to manually adjust the initial leg positions.
+      sLegInitXZAdjust = rx/16;        // play with this.
+      sLegInitAngleAdjust = ry/8;
+      rx = 0;
+      ry = 0;
+      
       // Likewise for Speed control
-      int dspeed = command.lookH / 16;   // 
-      if ((dspeed < 0) && g_InControlState.SpeedControl) {
-        if ((word)(-dspeed) <  g_InControlState.SpeedControl)
-          g_InControlState.SpeedControl += dspeed;
+      delta = command.leftH / 16;   // 
+      if ((delta < 0) && g_InControlState.SpeedControl) {
+        if ((word)(-delta) <  g_InControlState.SpeedControl)
+          g_InControlState.SpeedControl += delta;
         else 
           g_InControlState.SpeedControl = 0;
         MSound( 1, 50, 1000+g_InControlState.SpeedControl);  
       }
-      if ((dspeed > 0) && (g_InControlState.SpeedControl < 2000)) {
-        g_InControlState.SpeedControl += dspeed;
+      if ((delta > 0) && (g_InControlState.SpeedControl < 2000)) {
+        g_InControlState.SpeedControl += delta;
         if (g_InControlState.SpeedControl > 2000)
           g_InControlState.SpeedControl = 2000;
         MSound( 1, 50, 1000+g_InControlState.SpeedControl); 
       }
 
-      command.lookH = 0; // don't walk when adjusting the speed here...
+      command.leftH = 0; // don't walk when adjusting the speed here...
     }
 
+#ifdef DBGSerial
+    if ((command.buttons & BUT_R3) && !(buttonsPrev & BUT_R3)) {
+        MSound(1, 50, 2000);
+        g_fDebugOutput = !g_fDebugOutput;
+    }
+#endif    
     //[Walk functions]
     if (ControlMode == WALKMODE) {
       //Switch gates
@@ -297,12 +392,12 @@ void CommanderInputController::ControlInput(void)
 
       //Walking
       if (WalkMethod)  //(Walk Methode) 
-        g_InControlState.TravelLength.z = (command.lookV); //Right Stick Up/Down  
+        g_InControlState.TravelLength.z = (command.leftV); //Right Stick Up/Down  
 
       else
       {
-        g_InControlState.TravelLength.x = -command.walkH;
-        g_InControlState.TravelLength.z = command.walkV;
+        g_InControlState.TravelLength.x = -rx;
+        g_InControlState.TravelLength.z = -ry;
       }
 
       if (!DoubleTravelOn) {  //(Double travel length)
@@ -310,28 +405,28 @@ void CommanderInputController::ControlInput(void)
         g_InControlState.TravelLength.z = g_InControlState.TravelLength.z/2;
       }
 
-      g_InControlState.TravelLength.y = -(command.lookH)/4; //Right Stick Left/Right 
+      g_InControlState.TravelLength.y = -(command.leftH)/4; //Right Stick Left/Right 
     }
 
     //[Translate functions]
     g_BodyYShift = 0;
     if (ControlMode == TRANSLATEMODE) {
-      g_InControlState.BodyPos.x =  SmoothControl(((command.walkH)*2/3), g_InControlState.BodyPos.x, SmDiv);
-      g_InControlState.BodyPos.z =  SmoothControl(((command.walkV)*2/3), g_InControlState.BodyPos.z, SmDiv);
-      g_InControlState.BodyRot1.y = SmoothControl(((command.lookH)*2), g_InControlState.BodyRot1.y, SmDiv);
+      g_InControlState.BodyPos.x =  SmoothControl(((rx)*2/3), g_InControlState.BodyPos.x, SmDiv);
+      g_InControlState.BodyPos.z =  SmoothControl(((ry)*2/3), g_InControlState.BodyPos.z, SmDiv);
+      g_InControlState.BodyRot1.y = SmoothControl(((command.leftH)*2), g_InControlState.BodyRot1.y, SmDiv);
 
-      //      g_InControlState.BodyPos.x = (command.walkH)/2;
-      //      g_InControlState.BodyPos.z = -(command.walkV)/3;
-      //      g_InControlState.BodyRot1.y = (command.lookH)*2;
-      g_BodyYShift = (-(command.lookV)/2);
+      //      g_InControlState.BodyPos.x = (rx)/2;
+      //      g_InControlState.BodyPos.z = -(ry)/3;
+      //      g_InControlState.BodyRot1.y = (command.leftH)*2;
+      g_BodyYShift = (-(command.leftV)/2);
     }
 
     //[Rotate functions]
     if (ControlMode == ROTATEMODE) {
-      g_InControlState.BodyRot1.x = (command.walkV);
-      g_InControlState.BodyRot1.y = (command.lookH)*2;
-      g_InControlState.BodyRot1.z = (command.walkH);
-      g_BodyYShift = (-(command.lookV)/2);
+      g_InControlState.BodyRot1.x = (ry);
+      g_InControlState.BodyRot1.y = (command.leftH)*2;
+      g_InControlState.BodyRot1.z = (rx);
+      g_BodyYShift = (-(command.leftV)/2);
     }
 #ifdef OPT_GPPLAYER
     //[GPPlayer functions]
@@ -341,13 +436,13 @@ void CommanderInputController::ControlInput(void)
       // Have to keep reminding myself that commander library already subtracted 128...
       if (g_ServoDriver.FIsGPSeqActive() ) {
         if ((g_sGPSMController != 32767)  
-          || (command.lookV > 16) || (command.lookV < -16))
+          || (command.leftV > 16) || (command.leftV < -16))
         {
           // We are in speed modify mode...
-          if (command.lookV >= 0)
-            g_sGPSMController = map(command.lookV, 0, 127, 0, 200);
+          if (command.leftV >= 0)
+            g_sGPSMController = map(command.leftV, 0, 127, 0, 200);
           else  
-            g_sGPSMController = map(command.lookV, -127, 0, -200, 0);
+            g_sGPSMController = map(command.leftV, -127, 0, -200, 0);
           g_ServoDriver.GPSetSpeedMultiplyer(g_sGPSMController);
         }
       }
@@ -373,7 +468,7 @@ void CommanderInputController::ControlInput(void)
         }
         else {
           g_ServoDriver.GPStartSeq(0xff);    // tell the GP system to abort if possible...
-            MSound (2, 50, 2000, 50, 2000);
+          MSound (2, 50, 2000, 50, 2000);
         }
       }
 
@@ -385,15 +480,15 @@ void CommanderInputController::ControlInput(void)
       //Switch leg for single leg control
       if ((command.buttons & BUT_R1) && !(buttonsPrev & BUT_R1)) {
         MSound (1, 50, 2000);  
-        if (g_InControlState.SelectedLeg<5)
+        if (g_InControlState.SelectedLeg<(CNT_LEGS-1))
           g_InControlState.SelectedLeg = g_InControlState.SelectedLeg+1;
         else
           g_InControlState.SelectedLeg=0;
       }
 
-      g_InControlState.SLLeg.x= (byte)((int)command.walkH+128)/2; //Left Stick Right/Left
-      g_InControlState.SLLeg.y= (byte)((int)command.lookV+128)/10; //Right Stick Up/Down
-      g_InControlState.SLLeg.z = (byte)((int)command.walkV+128)/2; //Left Stick Up/Down
+      g_InControlState.SLLeg.x= (byte)((int)rx+128)/2; //Left Stick Right/Left
+      g_InControlState.SLLeg.y= (byte)((int)command.leftV+128)/10; //Right Stick Up/Down
+      g_InControlState.SLLeg.z = (byte)((int)ry+128)/2; //Left Stick Up/Down
 
       // Hold single leg in place
       if ((command.buttons & BUT_RT) && !(buttonsPrev & BUT_RT)) {
@@ -404,10 +499,30 @@ void CommanderInputController::ControlInput(void)
 
 
     //Calculate walking time delay
-    g_InControlState.InputTimeDelay = 128 - max(max(abs(command.walkH), abs(command.walkV)), abs(command.lookH));
+    g_InControlState.InputTimeDelay = 128 - max(max(abs(rx), abs(ry)), abs(command.leftH));
 
     //Calculate g_InControlState.BodyPos.y
     g_InControlState.BodyPos.y = max(g_BodyYOffset + g_BodyYShift,  0);
+
+    if (sLegInitXZAdjust || sLegInitAngleAdjust) {
+        // User asked for manual leg adjustment - only do when we have finished any previous adjustment
+        
+        if (!g_InControlState.ForceGaitStepCnt) {
+            if (sLegInitXZAdjust)
+                g_fDynamicLegXZLength = true;
+            
+            sLegInitXZAdjust += GetLegsXZLength();  // Add on current length to our adjustment...
+            // Handle maybe change angles...
+            if (sLegInitAngleAdjust) 
+                RotateLegInitAngles(sLegInitAngleAdjust);
+                
+            // Give system time to process previous calls
+            AdjustLegPositions(sLegInitXZAdjust);
+        }
+    }    
+
+    if (fAdjustLegPositions && !g_fDynamicLegXZLength)
+      AdjustLegPositionsToBodyHeight();    // Put main workings into main program file
 
     // Save away the buttons state as to not process the same press twice.
     buttonsPrev = command.buttons;
@@ -416,7 +531,7 @@ void CommanderInputController::ControlInput(void)
   } 
   else {
     // We did not receive a valid packet.  check for a timeout to see if we should turn robot off...
-    if (g_InControlState.fHexOn) {
+    if (g_InControlState.fRobotOn) {
       if ((millis() - g_ulLastMsgTime) > ARBOTIX_TO)
         CommanderTurnRobotOff();
     }
@@ -441,22 +556,101 @@ void CommanderTurnRobotOff(void)
   g_BodyYOffset = 0;
   g_BodyYShift = 0;
   g_InControlState.SelectedLeg = 255;
-  g_InControlState.fHexOn = 0;
+  g_InControlState.fRobotOn = 0;
+  g_fDynamicLegXZLength = false; // also make sure the robot is back in normal leg init mode...
 }
 
 
-#endif //USECOMMANDER
+//==============================================================================
+// The below class code is based on the commander class by Michael Ferguson... 
+// I included and updated for my own usage...  As I may not always use 
+// Serial and I wish to decouple usage of joysticks from the names...
+//==============================================================================
 
+/*
+  Commander.cpp - Library for interfacing with ArbotiX Commander
+ Copyright (c) 2009-2012 Michael E. Ferguson.  All right reserved.
+ 
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ 
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ 
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
 
+//==============================================================================
+// Commander::Commander - Constructor
+//==============================================================================
+Commander::Commander(){
+  index = -1;
+}
 
+//==============================================================================
+// Commander::begin 
+//==============================================================================
+void Commander::begin(unsigned long baud){
+  XBeeSerial.begin(baud);
+}
 
+//==============================================================================
+// ReadMsgs
+//==============================================================================
 
-
-
-
-
-
-
-
-
+/* process messages coming from Commander 
+ *  format = 0xFF RIGHT_H RIGHT_V LEFT_H LEFT_V BUTTONS EXT CHECKSUM */
+int Commander::ReadMsgs(){
+  while(XBeeSerial.available() > 0){
+    //		digitalWrite(0, !digitalRead(0));
+    if(index == -1){         // looking for new packet
+      if(XBeeSerial.read() == 0xff){
+        index = 0;
+        checksum = 0;
+      }
+    }
+    else if(index == 0){
+      vals[index] = (unsigned char) XBeeSerial.read();
+      if(vals[index] != 0xff){            
+        checksum += (int) vals[index];
+        index++;
+      }
+    }
+    else{
+      vals[index] = (unsigned char) XBeeSerial.read();
+      checksum += (int) vals[index];
+      index++;
+      if(index == 7){ // packet complete
+        if(checksum%256 != 255){
+          // packet error!
+          index = -1;
+          return 0;
+        }
+        else{
+          digitalWrite(0, !digitalRead(0));
+          leftV = (signed char)( (int)vals[0]-128 );
+          leftH = (signed char)( (int)vals[1]-128 );
+          rightV = (signed char)( (int)vals[2]-128 );
+          rightH = (signed char)( (int)vals[3]-128 );
+          buttons = vals[4];
+          ext = vals[5];
+        }
+        index = -1;
+        while (XBeeSerial.read() != -1)
+          ;
+        //XBeeSerial.flush();  ' Not the same on Arduino 1.0+
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+//==============================================================================
+//==============================================================================
 

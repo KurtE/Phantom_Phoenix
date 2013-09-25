@@ -1,14 +1,15 @@
 //====================================================================
 //Project Lynxmotion Phoenix
 //Description: 
-//    This is the hardware configuration file for the PhantomX robot.
+//    This is the hardware configuration file for the 
+//    Version 2 PhantomX robot.
 //    Will first define to use their commander unit.
 //
-//Date: March 18, 2012
+//Date: June 19, 2013
 //Programmer: Kurt (aka KurtE)
 //
 //NEW IN V1.0
-//   - First Release
+//   - First Release - Changes from Trossen member KingPin
 //
 //====================================================================
 #ifndef HEX_CFG_H
@@ -20,9 +21,9 @@
 //  If this is not defined, The included Controller should simply implement the InputController Class...
 //==================================================================================================================================
 //#define USEMULTI
-#define USEXBEE            // only allow to be defined on Megas...
+//#define USEXBEE            // only allow to be defined on Megas...
 //#define USEPS2
-//#define USECOMMANDER
+#define USECOMMANDER
 
 // Global defines to control which configuration we are using.  Note: Only define one of these...
 // 
@@ -34,26 +35,26 @@
 //#define DBGSerial         Serial
 
 // Define other optional compnents to be included or not...
+//#define PHANTOMX_V2     // Some code may depend on it being a V2 PhantomX
+#define cFemurHornOffset1 -70
+#define cTibiaHornOffset1 380
+#define cRRTibiaInv 0 
+#define cRMTibiaInv 0 
+#define cRFTibiaInv 0 
+#define cLRTibiaInv 1 
+#define cLMTibiaInv 1 
+#define cLFTibiaInv 1 
 
-//===================================================================
-// Code to allow Phantom to walk if it is turned upside down.
-// This code assumes that the tibias have been changed such that the 0 point has the legs
-// sticking straight out instead of at a 90 degree angle.
-#define OPT_WALK_UPSIDE_DOWN
-#ifdef OPT_WALK_UPSIDE_DOWN
-#define  IsRobotUpsideDown  (analogRead(0) < 500)
-#else
-#endif
 
 //===================================================================
 // Debug Options
 #ifdef DBGSerial
 #define OPT_TERMINAL_MONITOR  
 //#define OPT_FIND_SERVO_OFFSETS    // Only useful if terminal monitor is enabled
-#define OPT_PYPOSE
+//#define OPT_PYPOSE
 #endif
 
-#define DEBUG_IOPINS
+//#define DEBUG_IOPINS
 #ifdef DEBUG_IOPINS
 #define DebugToggle(pin)  {digitalWrite(pin, !digitalRead(pin));}
 #define DebugWrite(pin, state) {digitalWrite(pin, state);}
@@ -68,7 +69,7 @@
 #define OPT_BACKGROUND_PROCESS    // The AX12 has a background process
 #define OPT_GPPLAYER
 
-#define USE_PYPOSE_HEADER
+
 //==================================================================================================================================
 //==================================================================================================================================
 //==================================================================================================================================
@@ -91,9 +92,9 @@
 #define PS2_CLK      A3
 
 // Define Analog pin and minimum voltage that we will allow the servos to run
-#define cVoltagePin  7      // Use our Analog pin jumper here...
-#define CVADR1      1000  // VD Resistor 1 - reduced as only need ratio... 20K and 4.66K
-#define CVADR2      233   // VD Resistor 2
+//#define cVoltagePin  7      // Use our Analog pin jumper here...
+//#define CVADR1      1000  // VD Resistor 1 - reduced as only need ratio... 20K and 4.66K
+//#define CVADR2      233   // VD Resistor 2
 #define cTurnOffVol  1000     // 10v
 #define cTurnOnVol   1100     // 11V - optional part to say if voltage goes back up, turn it back on...
 
@@ -131,72 +132,50 @@
 #define cLFFemurPin     3   //Front Left leg Hip Vertical
 #define cLFTibiaPin     5   //Front Left leg Knee
 
+
 //--------------------------------------------------------------------
-//[MIN/MAX ANGLES] - Start off assume same as Phoenix...#define cRRCoxaMin1    -700    //Mechanical limits of the Right Rear Leg, decimals = 1
-#ifdef OPT_WALK_UPSIDE_DOWN
-#define cXXTibiaMin1    -1500
-#define cXXTibiaMax1    1500
-#else
-#define cXXTibiaMin1    -700
-#define cXXTibiaMax1    900
-#endif
+//[MIN/MAX ANGLES] - Start off assume same as Phoenix...
+#define cRRCoxaMin1    -750
+#define cRRCoxaMax1    750
+#define cRRFemurMin1    -1000
+#define cRRFemurMax1    1000
+#define cRRTibiaMin1    -1020
+#define cRRTibiaMax1    670
 
-#define cRRCoxaMin1    -700
-#define cRRCoxaMax1    700
-#define cRRFemurMin1    -900
-#define cRRFemurMax1    900
-#define cRRTibiaMin1    cXXTibiaMin1
-#define cRRTibiaMax1    cXXTibiaMax1
+#define cRMCoxaMin1    -750    //Mechanical limits of the Right Middle Leg, decimals = 1
+#define cRMCoxaMax1     750
+#define cRMFemurMin1     -1000
+#define cRMFemurMax1     1000
+#define cRMTibiaMin1    -1020
+#define cRMTibiaMax1     670
 
+#define cRFCoxaMin1    -750    //Mechanical limits of the Right Front Leg, decimals = 1
+#define cRFCoxaMax1     750
+#define cRFFemurMin1    -1000
+#define cRFFemurMax1    1000
+#define cRFTibiaMin1    -1020
+#define cRFTibiaMax1    670
 
+#define cLRCoxaMin1    -750    //Mechanical limits of the Left Rear Leg, decimals = 1
+#define cLRCoxaMax1     750
+#define cLRFemurMin1     -1000
+#define cLRFemurMax1     1000
+#define cLRTibiaMin1    -1020
+#define cLRTibiaMax1     670
 
+#define cLMCoxaMin1    -1000    //Mechanical limits of the Left Middle Leg, decimals = 1
+#define cLMCoxaMax1     1000
+#define cLMFemurMin1     -1000
+#define cLMFemurMax1     1000
+#define cLMTibiaMin1    -1020
+#define cLMTibiaMax1     670
 
-#define cRMCoxaMin1    -700    //Mechanical limits of the Right Middle Leg, decimals = 1
-#define cRMCoxaMax1     700
-#define cRMFemurMin1     -900
-#define cRMFemurMax1     900
-#define cRMTibiaMin1    cXXTibiaMin1
-#define cRMTibiaMax1     cXXTibiaMax1
-
-
-
-
-#define cRFCoxaMin1    -700    //Mechanical limits of the Right Front Leg, decimals = 1
-#define cRFCoxaMax1     700
-#define cRFFemurMin1    -900
-#define cRFFemurMax1    900
-#define cRFTibiaMin1    cXXTibiaMin1
-#define cRFTibiaMax1    cXXTibiaMax1
-
-
-
-
-#define cLRCoxaMin1    -700    //Mechanical limits of the Left Rear Leg, decimals = 1
-#define cLRCoxaMax1     700
-#define cLRFemurMin1     -900
-#define cLRFemurMax1     900
-#define cLRTibiaMin1    cXXTibiaMin1
-#define cLRTibiaMax1     cXXTibiaMax1
-
-
-
-
-#define cLMCoxaMin1    -700    //Mechanical limits of the Left Middle Leg, decimals = 1
-#define cLMCoxaMax1     700
-#define cLMFemurMin1     -900
-#define cLMFemurMax1     900
-#define cLMTibiaMin1    cXXTibiaMin1
-#define cLMTibiaMax1     cXXTibiaMax1
-
-
-
-
-#define cLFCoxaMin1     -700    //Mechanical limits of the Left Front Leg, decimals = 1
-#define cLFCoxaMax1     700
-#define cLFFemurMin1     -900
-#define cLFFemurMax1     900
-#define cLFTibiaMin1    cXXTibiaMin1
-#define cLFTibiaMax1     cXXTibiaMax1
+#define cLFCoxaMin1     -750    //Mechanical limits of the Left Front Leg, decimals = 1
+#define cLFCoxaMax1     750
+#define cLFFemurMin1     -1000
+#define cLFFemurMax1     1000
+#define cLFTibiaMin1    -1020
+#define cLFTibiaMax1     670
 
 //--------------------------------------------------------------------
 //[Joint offsets]
@@ -208,39 +187,38 @@
 //[LEG DIMENSIONS]
 //Universal dimensions for each leg in mm
 #define cXXCoxaLength     52    // PhantomX leg dimensions.
-#define cXXFemurLength    83
-#define cXXTibiaLength    140
-#define cXXTarsLength     85    // 4DOF only...
+#define cXXFemurLength    66    // MEASURE THIS!!! Guessed now :-)
+#define cXXTibiaLength    133  // MEASURE THIS!!! Guessed now :-)
 
 #define cRRCoxaLength     cXXCoxaLength	    //Right Rear leg
 #define cRRFemurLength    cXXFemurLength
 #define cRRTibiaLength    cXXTibiaLength
-#define cRRTarsLength	  cXXTarsLength	    //4DOF ONLY
+
 
 #define cRMCoxaLength     cXXCoxaLength	    //Right middle leg
 #define cRMFemurLength    cXXFemurLength
 #define cRMTibiaLength    cXXTibiaLength
-#define cRMTarsLength	  cXXTarsLength	    //4DOF ONLY
+
 
 #define cRFCoxaLength     cXXCoxaLength	    //Rigth front leg
 #define cRFFemurLength    cXXFemurLength
 #define cRFTibiaLength    cXXTibiaLength
-#define cRFTarsLength	  cXXTarsLength    //4DOF ONLY
+
 
 #define cLRCoxaLength     cXXCoxaLength	    //Left Rear leg
 #define cLRFemurLength    cXXFemurLength
 #define cLRTibiaLength    cXXTibiaLength
-#define cLRTarsLength	  cXXTarsLength    //4DOF ONLY
+
 
 #define cLMCoxaLength     cXXCoxaLength	    //Left middle leg
 #define cLMFemurLength    cXXFemurLength
 #define cLMTibiaLength    cXXTibiaLength
-#define cLMTarsLength	  cXXTarsLength	    //4DOF ONLY
+
 
 #define cLFCoxaLength     cXXCoxaLength	    //Left front leg
 #define cLFFemurLength    cXXFemurLength
 #define cLFTibiaLength    cXXTibiaLength
-#define cLFTarsLength	  cXXTarsLength	    //4DOF ONLY
+
 
 
 //--------------------------------------------------------------------

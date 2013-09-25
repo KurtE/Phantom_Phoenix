@@ -4,19 +4,7 @@
 // Servo Driver - This version is setup to use AX-12 type servos using the
 // Arbotix AX12 and bioloid libraries (which may have been updated)
 //====================================================================
-#if ARDUINO>99
 #include <Arduino.h> // Arduino 1.0
-#else
-#include <Wprogram.h> // Arduino 0022
-#include <avr\pgmspace.h>
-#endif
-#include "Hex_Globals.h"
-#include "ServoDriver.h"
-
-#ifdef USE_PYPOSE_HEADER
-#define EXPORT_POSE_LIST
-#include "PyPoseGen.h"
-#endif
 
 #ifdef c4DOF
 #define NUMSERVOSPERLEG 4
@@ -24,9 +12,7 @@
 #define NUMSERVOSPERLEG 3
 #endif
 
-#define NUMSERVOS (NUMSERVOSPERLEG*6)
-
-#ifdef USE_AX12_DRIVER
+#define NUMSERVOS (NUMSERVOSPERLEG*CNT_LEGS)
 
 #include <ax12.h>
 
@@ -57,6 +43,16 @@ word      g_awGoalAXPos[NUMSERVOS];
 //=============================================================================
 // Global - Local to this file only...
 //=============================================================================
+#ifdef QUADMODE
+static const byte cPinTable[] PROGMEM = {
+  cRRCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLFCoxaPin, 
+  cRRFemurPin, cRFFemurPin, cLRFemurPin, cLFFemurPin,
+  cRRTibiaPin, cRFTibiaPin, cLRTibiaPin, cLFTibiaPin
+#ifdef c4DOF
+ ,cRRTarsPin,  cRFTarsPin,  cLRTarsPin,  cLFTarsPin
+#endif
+};
+#else
 static const byte cPinTable[] PROGMEM = {
   cRRCoxaPin,  cRMCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLMCoxaPin,  cLFCoxaPin, 
   cRRFemurPin, cRMFemurPin, cRFFemurPin, cLRFemurPin, cLMFemurPin, cLFFemurPin,
@@ -65,10 +61,12 @@ static const byte cPinTable[] PROGMEM = {
     ,cRRTarsPin, cRMTarsPin, cRFTarsPin, cLRTarsPin, cLMTarsPin, cLFTarsPin
 #endif
 };
+#endif
 #define FIRSTCOXAPIN     0
-#define FIRSTFEMURPIN    6
-#define FIRSTTIBIAPIN    12
-#define FIRSTTARSPIN     18
+#define FIRSTFEMURPIN    (CNT_LEGS)
+#define FIRSTTIBIAPIN    (CNT_LEGS*2)
+#define FIRSTTARSPIN     (CNT_LEGS*3)
+
 // Not sure yet if I will use the controller class or not, but...
 BioloidControllerEx bioloid = BioloidControllerEx(1000000);
 boolean g_fServosFree;    // Are the servos in a free state?
@@ -83,7 +81,7 @@ boolean g_fServosFree;    // Are the servos in a free state?
 
 
 // Not sure if pragma needed or not...
-#pragma pack(1)
+//#pragma pack(1)
 typedef struct {
   byte  bSeqNum;       // the sequence number, used to verify
   byte  bCntServos;    // count of servos
@@ -119,7 +117,7 @@ void ServoDriver::Init(void) {
   // First lets get the actual servo positions for all of our servos...
   pinMode(0, OUTPUT);
   g_fServosFree = true;
-  bioloid.poseSize = 18;
+  bioloid.poseSize = NUMSERVOS;
   bioloid.readPose();
 #ifdef cVoltagePin  
   for (byte i=0; i < 8; i++)
@@ -157,28 +155,37 @@ word ServoDriver::GetBatteryVoltage(void) {
 }
 
 #else
-#define VOLTAGE_REPEAT_MAX  3
-#define VOLTAGE_MAX_TIME_BETWEEN_CALLS 500    // call at least twice a second...
-
+#define VOLTAGE_MIN_TIME_BETWEEN_CALLS 250      // Max 4 times per second
+#define VOLTAGE_MAX_TIME_BETWEEN_CALLS 1000    // call at least once per second...
+#define VOLTAGE_TIME_TO_ERROR          3000    // Error out if no valid item is returned in 3 seconds...
 word g_wLastVoltage = 0xffff;    // save the last voltage we retrieved...
-
+byte g_bLegVoltage = 0;		// what leg did we last check?
 unsigned long g_ulTimeLastBatteryVoltage;
 
 word ServoDriver::GetBatteryVoltage(void) {
-  if (bioloid.interpolating && (g_wLastVoltage != 0xffff)  && ((millis()-g_ulTimeLastBatteryVoltage) < VOLTAGE_MAX_TIME_BETWEEN_CALLS))
-    return g_wLastVoltage;
+  // In this case, we have to ask a servo for it's current voltage level, which is a lot more overhead than simply doing
+  // one AtoD operation.  So we will limit when we actually do this to maybe a few times per second.  
+  // Or longer if we are in the process of interpolating...
+  unsigned long ulDeltaTime = millis() - g_ulTimeLastBatteryVoltage;
+  if (g_wLastVoltage != 0xffff) {
+      if ( (ulDeltaTime < VOLTAGE_MIN_TIME_BETWEEN_CALLS) 
+            || (bioloid.interpolating &&  (ulDeltaTime < VOLTAGE_MAX_TIME_BETWEEN_CALLS)))
+        return g_wLastVoltage;
+  }
 
-  register uint8_t bLoopCnt = VOLTAGE_REPEAT_MAX;
-  do {
-    register word wVoltage = ax12GetRegister (1, AX_PRESENT_VOLTAGE, 1);
-    if (wVoltage != 0xffff) {
+  // Lets cycle through the Tibia servos asking for voltages as they may be the ones doing the most work...
+  register word wVoltage = ax12GetRegister (pgm_read_byte(&cPinTable[FIRSTTIBIAPIN+g_bLegVoltage]), AX_PRESENT_VOLTAGE, 1);
+  if (++g_bLegVoltage >= CNT_LEGS)
+	g_bLegVoltage = 0;
+  if (wVoltage != 0xffff) {
       g_ulTimeLastBatteryVoltage = millis();
       g_wLastVoltage = wVoltage * 10;
       return g_wLastVoltage;
-    }
-  } 
-  while (--bLoopCnt);
+  }
 
+  // Allow it to error our a few times, but if the time until we get a valid response exceeds some time limit then error out.
+  if (ulDeltaTime < VOLTAGE_TIME_TO_ERROR)
+    return g_wLastVoltage;
   return 0;
 
 }
@@ -211,7 +218,7 @@ boolean ServoDriver::FIsGPSeqDefined(uint8_t iSeq)
     g_ptransCur = (transition_t *)pgm_read_word(&PoseList[iSeq]);
     // First entry in this table has the count of poses.
     g_eepph.bCntSteps = (byte)pgm_read_word(&(g_ptransCur->time));
-    g_eepph.bCntServos = 18;
+    g_eepph.bCntServos = NUMSERVOS;
 
     return true;  // say that we are valid...
   }
@@ -230,8 +237,8 @@ boolean ServoDriver::FIsGPSeqDefined(uint8_t iSeq)
   // Now Read in the actual header
   EEPROMReadData(g_wSeqHeaderStart, (uint8_t*)&g_eepph, sizeof(g_eepph));
 
-  if ((g_eepph.bSeqNum != iSeq) || (g_eepph.bCntServos != 18) ||
-    ((g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (g_eepph.bCntPoses * sizeof(word) * 18)) >= GPSEQ_EEPROM_SIZE))
+  if ((g_eepph.bSeqNum != iSeq) || (g_eepph.bCntServos != NUMSERVOS) ||
+    ((g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (g_eepph.bCntPoses * sizeof(word) * NUMSERVOS)) >= GPSEQ_EEPROM_SIZE))
     return false;
 
   return true;  // Looks like it is valid
@@ -331,8 +338,8 @@ void ServoDriver::GPPlayer(void)
     EEPROMReadData(g_wSeqHeaderStart + sizeof(g_eepph) + (g_bSeqStepNum*sizeof(EEPROMPoseSeq)), (uint8_t*)&eepps, sizeof(eepps));
 
     // Now lets setup to read in the pose information
-    word wEEPromPoseLoc = g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntPoses*sizeof(EEPROMPoseSeq)) + (eepps.bPoseNum * sizeof(word) * 18);  // should not hard code 18
-    for (bServo=0; bServo < 18; bServo++) {
+    word wEEPromPoseLoc = g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntPoses*sizeof(EEPROMPoseSeq)) + (eepps.bPoseNum * sizeof(word) * NUMSERVOS); 
+    for (bServo=0; bServo < NUMSERVOS; bServo++) {
       EEPROMReadData(wEEPromPoseLoc, (uint8_t*)&wPosePos, sizeof(wPosePos));
       if (!fRobotUpsideDownGPStart) {
         bioloid.setNextPoseByIndex(bServo, wPosePos);  // set a servo value by index for next pose
@@ -419,25 +426,13 @@ void ServoDriver::OutputServoInfoForLeg(byte LegIndex, short sCoxaAngle1, short 
 #ifdef c4DOF
   word    wTarsSSCV;        //
 #endif
-
-  //Update Right Legs
-  g_InputController.AllowControllerInterrupts(false);    // If on xbee on hserial tell hserial to not processess...
-  if (LegIndex < 3) {
-    wCoxaSSCV = (((long)(-sCoxaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-    wFemurSSCV = (((long)(-sFemurAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-    wTibiaSSCV = (((long)(-sTibiaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
+  // The Main code now takes care of the inversion before calling.
+  wCoxaSSCV = (((long)(sCoxaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
+  wFemurSSCV = (((long)((long)(sFemurAngle1))* cPwmMult) / cPwmDiv +cPFConst);
+  wTibiaSSCV = (((long)(sTibiaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
 #ifdef c4DOF
-    wTarsSSCV = (((long)(-sTarsAngle1))* cPwmMult) / cPwmDiv +cPFConst;
+  wTarsSSCV = (((long)(sTarsAngle1))* cPwmMult) / cPwmDiv +cPFConst;
 #endif
-  } 
-  else {
-    wCoxaSSCV = (((long)(sCoxaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-    wFemurSSCV = (((long)((long)(sFemurAngle1))* cPwmMult) / cPwmDiv +cPFConst);
-    wTibiaSSCV = (((long)(sTibiaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-#ifdef c4DOF
-    wTarsSSCV = (((long)(sTarsAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-#endif
-  }
   if (ServosEnabled) {
     if (g_fAXSpeedControl) {
 #ifdef USE_AX12_SPEED_CONTROL
@@ -593,7 +588,9 @@ void ServoDriver::FreeServos(void)
 }
 
 //--------------------------------------------------------------------
-//[FREE SERVOS] Frees all the servos
+//[MakeSureServosAreOn] Function that is called to handle when you are
+//  transistioning from servos all off to being on.  May need to read
+//  in the current pose...
 //--------------------------------------------------------------------
 void MakeSureServosAreOn(void)
 {
@@ -633,6 +630,15 @@ void  ServoDriver::BackgroundProcess(void)
     DebugToggle(A3);
 
     bioloid.interpolateStep(false);    // Do our background stuff...
+    
+    // Hack if we are not interpolating, maybe try to get voltage.  This will acutally only do this
+    // a few times per second.
+#ifdef cTurnOffVol          // only do if we a turn off voltage is defined
+#ifndef cVoltagePin         // and we are not doing AtoD type of conversion...
+    if (!bioloid.interpolating )
+        GetBatteryVoltage();
+#endif    
+#endif
   }
 }
 
@@ -653,9 +659,6 @@ void ServoDriver::ShowTerminalCommandList(void)
 #endif
 #ifdef OPT_FIND_SERVO_OFFSETS
   DBGSerial.println(F("O - Enter Servo offset mode"));
-#endif        
-#ifdef OPT_SSC_FORWARDER
-  DBGSerial.println(F("S - SSC Forwarder"));
 #endif        
 }
 
@@ -715,32 +718,15 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
     FindServoOffsets();
   }
 #endif
-#ifdef OPT_SSC_FORWARDER
-  else if ((bLen == 1) && ((*psz == 's') || (*psz == 'S'))) {
-    SSCForwarder();
-  }
-#endif
 #ifdef OPT_PYPOSE
   else if ((*psz == 'p') || (*psz == 'P')) {
     DoPyPose(++psz);
   }
 #endif
+   return false;
 
 }
 #endif    
-
-
-//==============================================================================
-// SSC Forwarder - used to allow things like Lynxterm to talk to the SSC-32 
-// through the Arduino...  Will see if it is fast enough...
-//==============================================================================
-#ifdef OPT_SSC_FORWARDER
-void  SSCForwarder(void) 
-{
-}
-#endif // OPT_SSC_FORWARDER
-
-
 
 
 
@@ -786,7 +772,7 @@ void EEPROMReadData(word wStart, uint8_t *pv, byte cnt) {
 #define ARB_TEST        25
 
 // Global to this function...
-byte   g_bPoseSize = 18;  // assume poses are for 18 servos.
+byte   g_bPoseSize = NUMSERVOS;  
 
 short g_poses[540];              // enough for 30 steps...
 typedef struct{
@@ -814,20 +800,20 @@ void DoPyPose(byte *psz)
   byte index = 0;   // index in param buffer
   word wPoseIndex;
 
-  int checksum;              // checksum
+  int checksum = 0;              // checksum
 
 
     //  pose and sequence storage
   // Put on diet - convert int to short plus convert poses from 2 dimensions to 1 dimension...
   //
   byte seqPos;                // step in current sequence
-  word wMY;
 
   // See if the user gave us a string to process.  If so it should be the XBEE DL to talk to. 
   // BUGBUG:: if using our XBEE stuff could default to debug terminal... 
 #ifdef USEXBEE
 
 #ifdef DBGSerial
+  word wMY;
   wMY = GetXBeeHVal('M', 'Y');
 
   DBGSerial.print(F("My: "));
@@ -1047,7 +1033,6 @@ void DoPyPose(byte *psz)
               int i;
               // pass thru
               if(ins == AX_READ_DATA){
-                int i;
                 ax12GetRegister(id, g_bParams[0], g_bParams[1]);
                 // return a packet: FF FF id Len Err params check
                 if(ax_rx_buffer[3] > 0){
@@ -1095,7 +1080,6 @@ void EEPROMWriteData(word wStart, uint8_t *pv, byte cnt) {
 boolean PyPoseSaveToEEPROM(byte bSeqNum) {
   //first verify it is in range...
   byte iSeq;
-  word wDataStart;
   word w;
   word wHeaderStart;
   EEPromPoseHeader eepph; 
@@ -1115,11 +1099,11 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
       break;
     }
     EEPROMReadData(w, (uint8_t*)&eepph, sizeof(eepph));
-    if ((eepph.bSeqNum != iSeq) || (eepph.bCntServos != 18)) {
+    if ((eepph.bSeqNum != iSeq) || (eepph.bCntServos != NUMSERVOS)) {
       fValidHeaders = false;
       break;
     }
-    w = wHeaderStart + sizeof(eepph) + (eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (eepph.bCntPoses * sizeof(word) * 18);
+    w = wHeaderStart + sizeof(eepph) + (eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (eepph.bCntPoses * sizeof(word) * NUMSERVOS);
     if (w >= GPSEQ_EEPROM_SIZE) { 
       fValidHeaders = false;
       break;
@@ -1129,7 +1113,7 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
 
   // Note: if previous data invalid will try to store data after last valid one...
   eepph.bSeqNum = iSeq;    // save the sequence number here.
-  eepph.bCntServos = 18;  // say that it has 18 steps.
+  eepph.bCntServos = NUMSERVOS;  // say that it has NUMSERVOS steps.
   eepph.bCntPoses = 0;
   for (eepph.bCntSteps = 0; g_sequence[eepph.bCntSteps].pose != 0xff; eepph.bCntSteps++) {
     if (g_sequence[eepph.bCntSteps].pose > eepph.bCntPoses)
@@ -1138,7 +1122,7 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
   eepph.bCntPoses++;  // Cnt not index...
 
   // Make sure it will fit!  
-  if ((wHeaderStart + sizeof(eepph) + (eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (eepph.bCntPoses * sizeof(word) * 18)) >= GPSEQ_EEPROM_SIZE)
+  if ((wHeaderStart + sizeof(eepph) + (eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (eepph.bCntPoses * sizeof(word) * NUMSERVOS)) >= GPSEQ_EEPROM_SIZE)
     return false;
 
   // Now lets start writing out the data...
@@ -1163,7 +1147,7 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
   }
 
   // Last lets write out the Pose data...
-  EEPROMWriteData(wHeaderStart, (uint8_t*)g_poses, eepph.bCntPoses * 18 * sizeof(g_poses[0]));
+  EEPROMWriteData(wHeaderStart, (uint8_t*)g_poses, eepph.bCntPoses * NUMSERVOS * sizeof(g_poses[0]));
 
   return true;
 
@@ -1172,48 +1156,4 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
 
 
 #endif  //DOPypose
-
-
-
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
