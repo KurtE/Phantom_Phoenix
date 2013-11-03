@@ -5,7 +5,7 @@
 //Date: 29-10-2009
 //Programmer: Jeroen Janssen [aka Xan]
 //         Kurt Eckhardt(KurtE) converted to C and Arduino
-//   Kåre Halvorsen aka Zenta - Makes everything work correctly!     
+//   KÃ¥re Halvorsen aka Zenta - Makes everything work correctly!     
 //
 // This version of the Phoenix code was ported over to the Arduino Environement
 // and is specifically configured for the Lynxmotion BotBoarduino 
@@ -242,7 +242,7 @@ const bool cTibiaInv[] = {cRRTibiaInv, cRMTibiaInv, cRFTibiaInv, cLRTibiaInv, cL
 
 #ifdef c4DOF
 const boolean cTarsInv[] = {cRRTarsInv, cRMTarsInv, cRFTarsInv, cLRTarsInv, cLMTarsInv, cLFTarsInv};
-#endif	
+#endif  
 
 //Leg Lengths
 const byte cCoxaLength[] PROGMEM = {
@@ -351,9 +351,9 @@ const bool cTibiaInv[] = {cRRTibiaInv, cRFTibiaInv, cLRTibiaInv, cLFTibiaInv};
 
 #ifdef c4DOF
 const boolean cTarsInv[] = {
-	cRRTarsInv, cRFTarsInv, cLRTarsInv, cLFTarsInv};
-#endif	
-	
+    cRRTarsInv, cRFTarsInv, cLRTarsInv, cLFTarsInv};
+#endif  
+    
 
 
 //Leg Lengths
@@ -409,7 +409,7 @@ short           CoxaAngle1[CNT_LEGS];    //Actual Angle of the horizontal hip, d
 short           FemurAngle1[CNT_LEGS];   //Actual Angle of the vertical hip, decimals = 1
 short           TibiaAngle1[CNT_LEGS];   //Actual Angle of the knee, decimals = 1
 #ifdef c4DOF
-short           TarsAngle1[CNT_LEGS];	  //Actual Angle of the knee, decimals = 1
+short           TarsAngle1[CNT_LEGS];     //Actual Angle of the knee, decimals = 1
 #endif
 
 //--------------------------------------------------------------------
@@ -508,8 +508,8 @@ long            GaitPosY[CNT_LEGS];         //Array containing Relative Y positi
 long            GaitPosZ[CNT_LEGS];         //Array containing Relative Z position corresponding to the Gait
 long            GaitRotY[CNT_LEGS];         //Array containing Relative Y rotation corresponding to the Gait
 
-//boolean			GaitLegInAir[CNT_LEGS];		// True if leg is in the air
-//byte			GaitNextLeg;				// The next leg which will be lifted
+//boolean           GaitLegInAir[CNT_LEGS];     // True if leg is in the air
+//byte          GaitNextLeg;                // The next leg which will be lifted
 
 boolean         fWalking;            //  True if the robot are walking
 byte            bExtraCycle;          // Forcing some extra timed cycles for avoiding "end of gait bug"
@@ -666,6 +666,11 @@ void setup(){
   g_InControlState.GaitStep = 1;
   GaitSelect();
 
+#ifdef cTurretRotPin
+  g_InControlState.TurretRotAngle1 = cTurretRotInit;      // Rotation of turrent in 10ths of degree
+  g_InControlState.TurretTiltAngle1 = cTurretTiltInit;    // the tile for the turret
+#endif
+
   g_InputController.Init();
 
   // Servo Driver
@@ -685,6 +690,11 @@ void setup(){
   DBGSerial.println(IsRobotUpsideDown, DEC);
 #endif  
 #endif
+
+  // bugbug:: setup to set IO pin high for the LED display I have
+  pinMode(7, OUTPUT);
+  digitalWrite(7, HIGH);
+
 
 }
 
@@ -765,8 +775,8 @@ void loop(void)
     || (abs(g_InControlState.TravelLength.y)>cTravelDeadZone) || (g_InControlState.ForceGaitStepCnt != 0) || fWalking;
 
         DBGSerial.print("T("); 
-		DBGSerial.print(fWalking, DEC);
-		DBGSerial.print(" ");
+        DBGSerial.print(fWalking, DEC);
+        DBGSerial.print(" ");
         DBGSerial.print(g_InControlState.TravelLength.x,DEC); 
         DBGSerial.print(","); 
         DBGSerial.print(g_InControlState.TravelLength.y,DEC); 
@@ -954,6 +964,10 @@ void loop(void)
       g_ServoDriver.FreeServos();
       Eyes = 0;
     }
+
+    // Allow the Servo driver to do stuff durint our idle time
+    g_ServoDriver.IdleTime();
+
     // We also have a simple debug monitor that allows us to 
     // check things. call it here..
 #ifdef OPT_TERMINAL_MONITOR  
@@ -994,6 +1008,9 @@ void StartUpdateServos()
         cTibiaInv[LegIndex]? -TibiaAngle1[LegIndex] : TibiaAngle1[LegIndex]);
 #endif      
   }
+#ifdef cTurretRotPin
+  g_ServoDriver.OutputServoInfoForTurret(g_InControlState.TurretRotAngle1, g_InControlState.TurretTiltAngle1);  // fist just see if it will talk
+#endif  
 }
 
 
@@ -1065,7 +1082,7 @@ boolean CheckVoltage() {
     }
     delay(2000);
   }
-#endif	
+#endif  
   return g_fLowVoltageShutdown;
 }
 
@@ -1081,7 +1098,7 @@ void SingleLegControl(void)
 #ifndef QUADMODE
     (LegPosY[cRM]==(short)pgm_read_word(&cInitPosY[cRM])) && 
     (LegPosY[cLM]==(short)pgm_read_word(&cInitPosY[cLM])) && 
-#endif	
+#endif  
     (LegPosY[cLF]==(short)pgm_read_word(&cInitPosY[cLF]));
 
   if (g_InControlState.SelectedLeg<= (CNT_LEGS-1)) {
@@ -1138,19 +1155,19 @@ void GaitSelect(void)
   if (g_fDebugOutput) {
     DBGSerial.print(g_InControlState.GaitType, DEC);
     DBGSerial.print("    {");
-  	DBGSerial.print(g_InControlState.gaitCur.NomGaitSpeed, DEC);
+    DBGSerial.print(g_InControlState.gaitCur.NomGaitSpeed, DEC);
     DBGSerial.print(", ");
-	DBGSerial.print(g_InControlState.gaitCur.StepsInGait, DEC); 
+    DBGSerial.print(g_InControlState.gaitCur.StepsInGait, DEC); 
     DBGSerial.print(", ");
-	DBGSerial.print(g_InControlState.gaitCur.NrLiftedPos, DEC); 
+    DBGSerial.print(g_InControlState.gaitCur.NrLiftedPos, DEC); 
     DBGSerial.print(", ");
-	DBGSerial.print(g_InControlState.gaitCur.FrontDownPos, DEC);
+    DBGSerial.print(g_InControlState.gaitCur.FrontDownPos, DEC);
     DBGSerial.print(", ");
-	DBGSerial.print(g_InControlState.gaitCur.LiftDivFactor, DEC);
+    DBGSerial.print(g_InControlState.gaitCur.LiftDivFactor, DEC);
     DBGSerial.print(", ");
-	DBGSerial.print(g_InControlState.gaitCur.TLDivFactor, DEC);  
+    DBGSerial.print(g_InControlState.gaitCur.TLDivFactor, DEC);  
     DBGSerial.print(", ");
-	DBGSerial.print(g_InControlState.gaitCur.HalfLiftHeight, DEC); 
+    DBGSerial.print(g_InControlState.gaitCur.HalfLiftHeight, DEC); 
     DBGSerial.print(", {");
     for (int il = 0; il < CNT_LEGS; il++) {
         DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[il], DEC);
@@ -1171,22 +1188,22 @@ void GaitSeq(void)
   // for the direction we are about to go...
   
   if (fWalking || (g_InControlState.ForceGaitStepCnt != 0))
-	TravelRequest = true;	// Is walking or was walking...
+    TravelRequest = true;   // Is walking or was walking...
   else {
-	TravelRequest = (abs(g_InControlState.TravelLength.x)>cTravelDeadZone) 
-		|| (abs(g_InControlState.TravelLength.z)>cTravelDeadZone) 
-		|| (abs(g_InControlState.TravelLength.y)>cTravelDeadZone) ;
+    TravelRequest = (abs(g_InControlState.TravelLength.x)>cTravelDeadZone) 
+        || (abs(g_InControlState.TravelLength.z)>cTravelDeadZone) 
+        || (abs(g_InControlState.TravelLength.y)>cTravelDeadZone) ;
 
     if (TravelRequest) {
 #ifdef QUADCODE
-		// just start walking - Try to guess a good foot to start off on...
-		if (g_InControlState.TravelLength.z < 0) 
-			g_InControlState.GaitStep = ((g_InControlState.TravelLength.X < 0)? g_InControlState.gaitCur.GaitLegNr[cLR] : g_InControlState.gaitCur.GaitLegNr[cRR]);
-		else 
-			g_InControlState.GaitStep = ((g_InControlState.TravelLength.X < 0)? g_InControlState.gaitCur.GaitLegNr[cLF] : g_InControlState.gaitCur.GaitLegNr[cRF]);
-		// And lets backup a few Gaitsteps before this to allow it to start the up swing... 
-		g_InControlState.GaitStep = ((g_InControlState.GaitStep > g_InControlState.gaitCur.FrontDownPos)? (g_InControlState.GaitStep - g_InControlState.gaitCur.FrontDownPos) : (g_InControlState.GaitStep + g_InControlState.gaitCur.StepsInGait - g_InControlState.gaitCur.FrontDownPos);
-#endif		
+        // just start walking - Try to guess a good foot to start off on...
+        if (g_InControlState.TravelLength.z < 0) 
+            g_InControlState.GaitStep = ((g_InControlState.TravelLength.X < 0)? g_InControlState.gaitCur.GaitLegNr[cLR] : g_InControlState.gaitCur.GaitLegNr[cRR]);
+        else 
+            g_InControlState.GaitStep = ((g_InControlState.TravelLength.X < 0)? g_InControlState.gaitCur.GaitLegNr[cLF] : g_InControlState.gaitCur.GaitLegNr[cRF]);
+        // And lets backup a few Gaitsteps before this to allow it to start the up swing... 
+        g_InControlState.GaitStep = ((g_InControlState.GaitStep > g_InControlState.gaitCur.FrontDownPos)? (g_InControlState.GaitStep - g_InControlState.gaitCur.FrontDownPos) : (g_InControlState.GaitStep + g_InControlState.gaitCur.StepsInGait - g_InControlState.gaitCur.FrontDownPos);
+#endif      
     }
     else {    //Clear values under the cTravelDeadZone
       g_InControlState.TravelLength.x=0;
@@ -1220,7 +1237,7 @@ void Gait (byte GaitCurrentLegNr)
   short int LegStep = g_InControlState.GaitStep - g_InControlState.gaitCur.GaitLegNr[GaitCurrentLegNr];
 
   //Leg middle up position OK
-  //Gait in motion	                                                                                  
+  //Gait in motion                                                                                    
   // For Lifted pos = 1, 3, 5
   if ((TravelRequest && (g_InControlState.gaitCur.NrLiftedPos&1) && 
     LegStep==0) || (!TravelRequest && LegStep==0 && ((abs(GaitPosX[GaitCurrentLegNr])>2) || 
@@ -1239,7 +1256,7 @@ void Gait (byte GaitCurrentLegNr)
     GaitPosZ[GaitCurrentLegNr] = -g_InControlState.TravelLength.z/g_InControlState.gaitCur.LiftDivFactor;
     GaitRotY[GaitCurrentLegNr] = -g_InControlState.TravelLength.y/g_InControlState.gaitCur.LiftDivFactor;
   }    
-  // _A_	  
+  // _A_      
   // Optional Half heigth front (2, 3, 5 lifted positions)
   else if ((g_InControlState.gaitCur.NrLiftedPos>=2) && (LegStep==1 || LegStep==-(g_InControlState.gaitCur.StepsInGait-1)) && TravelRequest) {
     GaitPosX[GaitCurrentLegNr] = g_InControlState.TravelLength.x/g_InControlState.gaitCur.LiftDivFactor;
@@ -1254,7 +1271,7 @@ void Gait (byte GaitCurrentLegNr)
     GaitPosY[GaitCurrentLegNr] = -g_InControlState.LegLiftHeight/2;
     GaitPosZ[GaitCurrentLegNr] = -g_InControlState.TravelLength.z/2;
     GaitRotY[GaitCurrentLegNr] = -g_InControlState.TravelLength.y/2;
-  }  		
+  }         
 
   //Optional Half heigth Front 5 LiftedPos (5 lifted positions)
   else if ((g_InControlState.gaitCur.NrLiftedPos==5) && (LegStep==2 || LegStep==-(g_InControlState.gaitCur.StepsInGait-2)) && TravelRequest) {
@@ -1269,8 +1286,8 @@ void Gait (byte GaitCurrentLegNr)
   else if ((LegStep==g_InControlState.gaitCur.FrontDownPos || LegStep==-(g_InControlState.gaitCur.StepsInGait-g_InControlState.gaitCur.FrontDownPos)) && GaitPosY[GaitCurrentLegNr]<0) {
     GaitPosX[GaitCurrentLegNr] = g_InControlState.TravelLength.x/2;
     GaitPosZ[GaitCurrentLegNr] = g_InControlState.TravelLength.z/2;
-    GaitRotY[GaitCurrentLegNr] = g_InControlState.TravelLength.y/2;      	
-    GaitPosY[GaitCurrentLegNr] = 0;	
+    GaitRotY[GaitCurrentLegNr] = g_InControlState.TravelLength.y/2;         
+    GaitPosY[GaitCurrentLegNr] = 0; 
   }
 
   //Move body forward      
@@ -1402,7 +1419,7 @@ void BalanceBody(void)
         GetSinCos(COGAngle1);
         TotalTransX = (long)g_InControlState.gaitCur.COGRadius * (long)sin4 / c4DEC;
         TotalTransZ = (long)g_InControlState.gaitCur.COGRadius * (long)cos4 / c4DEC;
-	
+    
 #ifdef DEBUG
         if (g_fDebugOutput) {
           DBGSerial.print(" TotalTransX: ");
@@ -1662,8 +1679,8 @@ void LegIK (short IKFeetPosX, short IKFeetPosY, short IKFeetPosZ, byte LegIKLegN
   long            TGA_A_H4;
   long            TGA_B_H3;
 #else
-#define TarsOffsetXZ 0		// Vector value
-#define TarsOffsetY  0		//Vector value / The 2 DOF IK calcs (femur and tibia) are based upon these vectors
+#define TarsOffsetXZ 0      // Vector value
+#define TarsOffsetY  0      //Vector value / The 2 DOF IK calcs (femur and tibia) are based upon these vectors
 #endif
 
 
@@ -2145,8 +2162,8 @@ boolean TerminalMonitor(void)
     DBGSerial.println(F("E - Dump EEPROM"));
 #endif
 #ifdef QUADMODE
-	DBGSerial.println(F("B <percent>"));
-	DBGSerial.println(F("G ST NL RR RF LR LF"));
+    DBGSerial.println(F("B <percent>"));
+    DBGSerial.println(F("G ST NL RR RF LR LF"));
 #endif
     // Let the Servo driver show it's own set of commands...
     g_ServoDriver.ShowTerminalCommandList();
@@ -2327,55 +2344,55 @@ void DumpEEPROMCmd(byte *pszCmdLine) {
 void UpdateGaitCmd(byte *pszCmdLine) {
   // first byte can be H for hex or W for words...
   if (!*++pszCmdLine) {  // Need to get past the command letter first...
-	DBGSerial.print("St: ");
-	DBGSerial.print(g_InControlState.gaitCur.StepsInGait, DEC);
-	DBGSerial.print(" ");
-	DBGSerial.print(g_InControlState.gaitCur.NrLiftedPos, DEC);
-	DBGSerial.print(" ");
-	DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[cRR], DEC);
-	DBGSerial.print(" ");
-	DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[cRF], DEC);
-	DBGSerial.print(" ");
-	DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[cLR], DEC);
-	DBGSerial.print(" ");
-	DBGSerial.println(g_InControlState.gaitCur.GaitLegNr[cLF], DEC);
+    DBGSerial.print("St: ");
+    DBGSerial.print(g_InControlState.gaitCur.StepsInGait, DEC);
+    DBGSerial.print(" ");
+    DBGSerial.print(g_InControlState.gaitCur.NrLiftedPos, DEC);
+    DBGSerial.print(" ");
+    DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[cRR], DEC);
+    DBGSerial.print(" ");
+    DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[cRF], DEC);
+    DBGSerial.print(" ");
+    DBGSerial.print(g_InControlState.gaitCur.GaitLegNr[cLR], DEC);
+    DBGSerial.print(" ");
+    DBGSerial.println(g_InControlState.gaitCur.GaitLegNr[cLF], DEC);
   }
   else {
-	//Argument should be New percentage
+    //Argument should be New percentage
     word wStepsInGait = GetCmdLineNum(&pszCmdLine);
-	word wLifted = GetCmdLineNum(&pszCmdLine);
-	
-	// first pass only pass in number of steps and maybe Lifted pos
-	if (wStepsInGait) {
-		if (wLifted) {
-			// UPdated the lifted so lets update some of the gait properties
-			g_InControlState.gaitCur.NrLiftedPos = wLifted;
-			g_InControlState.gaitCur.FrontDownPos = (wLifted+1)/2;
-			g_InControlState.gaitCur.LiftDivFactor = (wLifted > 4)? 4 : 2;
-		}
+    word wLifted = GetCmdLineNum(&pszCmdLine);
+    
+    // first pass only pass in number of steps and maybe Lifted pos
+    if (wStepsInGait) {
+        if (wLifted) {
+            // UPdated the lifted so lets update some of the gait properties
+            g_InControlState.gaitCur.NrLiftedPos = wLifted;
+            g_InControlState.gaitCur.FrontDownPos = (wLifted+1)/2;
+            g_InControlState.gaitCur.LiftDivFactor = (wLifted > 4)? 4 : 2;
+        }
 
-		// Assume the ordering of the gait legs here and equal spaced
-		g_InControlState.gaitCur.StepsInGait = wStepsInGait;
-		g_InControlState.gaitCur.TLDivFactor = g_InControlState.gaitCur.StepsInGait-g_InControlState.gaitCur.NrLiftedPos;
-			
-		// See if user did pass in leg positions...
-		g_InControlState.gaitCur.GaitLegNr[cRR] = GetCmdLineNum(&pszCmdLine);
-		if (g_InControlState.gaitCur.GaitLegNr[cRR]) {
-			g_InControlState.gaitCur.GaitLegNr[cRF] = GetCmdLineNum(&pszCmdLine);
-			g_InControlState.gaitCur.GaitLegNr[cLR] = GetCmdLineNum(&pszCmdLine);
-			g_InControlState.gaitCur.GaitLegNr[cLF] = GetCmdLineNum(&pszCmdLine);
-		}
-		else {
-			wStepsInGait /= 4;	// equal spacing.
-			g_InControlState.gaitCur.GaitLegNr[cRR] = wStepsInGait / 2;
-			g_InControlState.gaitCur.GaitLegNr[cRF] = g_InControlState.gaitCur.GaitLegNr[cRR] + wStepsInGait;
-			g_InControlState.gaitCur.GaitLegNr[cLR] = g_InControlState.gaitCur.GaitLegNr[cRF] + wStepsInGait;
-			g_InControlState.gaitCur.GaitLegNr[cLF] = g_InControlState.gaitCur.GaitLegNr[cLR] + wStepsInGait;
-		}
-	
-		//g_InControlState.gaitCur.HalfLiftHeight = 3;
-		//g_InControlState.gaitCur.NomGaitSpeed = DEFAULT_GAIT_SPEED;
-	}	
+        // Assume the ordering of the gait legs here and equal spaced
+        g_InControlState.gaitCur.StepsInGait = wStepsInGait;
+        g_InControlState.gaitCur.TLDivFactor = g_InControlState.gaitCur.StepsInGait-g_InControlState.gaitCur.NrLiftedPos;
+            
+        // See if user did pass in leg positions...
+        g_InControlState.gaitCur.GaitLegNr[cRR] = GetCmdLineNum(&pszCmdLine);
+        if (g_InControlState.gaitCur.GaitLegNr[cRR]) {
+            g_InControlState.gaitCur.GaitLegNr[cRF] = GetCmdLineNum(&pszCmdLine);
+            g_InControlState.gaitCur.GaitLegNr[cLR] = GetCmdLineNum(&pszCmdLine);
+            g_InControlState.gaitCur.GaitLegNr[cLF] = GetCmdLineNum(&pszCmdLine);
+        }
+        else {
+            wStepsInGait /= 4;  // equal spacing.
+            g_InControlState.gaitCur.GaitLegNr[cRR] = wStepsInGait / 2;
+            g_InControlState.gaitCur.GaitLegNr[cRF] = g_InControlState.gaitCur.GaitLegNr[cRR] + wStepsInGait;
+            g_InControlState.gaitCur.GaitLegNr[cLR] = g_InControlState.gaitCur.GaitLegNr[cRF] + wStepsInGait;
+            g_InControlState.gaitCur.GaitLegNr[cLF] = g_InControlState.gaitCur.GaitLegNr[cLR] + wStepsInGait;
+        }
+    
+        //g_InControlState.gaitCur.HalfLiftHeight = 3;
+        //g_InControlState.gaitCur.NomGaitSpeed = DEFAULT_GAIT_SPEED;
+    }   
   }
 }
 #endif
@@ -2383,6 +2400,7 @@ void UpdateGaitCmd(byte *pszCmdLine) {
 
 
 #endif
+
 
 
 

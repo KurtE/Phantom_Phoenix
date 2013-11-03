@@ -132,6 +132,8 @@
 #define cLFFemurPin     3   //Front Left leg Hip Vertical
 #define cLFTibiaPin     5   //Front Left leg Knee
 
+#define cTurretRotPin  20   // Turret Rotate Pin
+#define cTurretTiltPin 21  // Turret Tilt pin
 
 //--------------------------------------------------------------------
 //[MIN/MAX ANGLES] - Start off assume same as Phoenix...
@@ -176,6 +178,11 @@
 #define cLFFemurMax1     1000
 #define cLFTibiaMin1    -1020
 #define cLFTibiaMax1     670
+
+#define cTurretRotMin1  -1500
+#define cTurretRotMax1  1500
+#define cTurretTiltMin1  -125
+#define cTurretTiltMax1  1100
 
 //--------------------------------------------------------------------
 //[Joint offsets]
@@ -293,6 +300,12 @@ extern const byte g_abHexMaxBodyY[] PROGMEM;
 #define cLFInitPosX     CHexInitXZCos60      //Start positions of the Left Front leg
 #define cLFInitPosY     CHexInitY
 #define cLFInitPosZ     -CHexInitXZSin60
+
+// Turret initial position
+#define cTurretRotInit  0
+#define cTurretTiltInit 0
+
+
 //--------------------------------------------------------------------
 //[Tars factors used in formula to calc Tarsus angle relative to the ground]
 #define cTarsst	720	//4DOF ONLY
@@ -302,3 +315,4 @@ extern const byte g_abHexMaxBodyY[] PROGMEM;
 #define cTarsFactorC	50	//4DOF ONLY
 
 #endif // HEX_CFG_H
+

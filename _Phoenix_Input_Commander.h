@@ -212,7 +212,7 @@ static byte    ControlMode;
 static byte    HeightSpeedMode;
 //static bool  DoubleHeightOn;
 static bool    DoubleTravelOn;
-static bool    WalkMethod;
+static byte    bJoystickWalkMode;
 byte           GPSeq;             //Number of the sequence
 
 static byte    buttonsPrev;
@@ -239,7 +239,7 @@ void CommanderInputController::Init(void)
   HeightSpeedMode = NORM_NORM;
   //    DoubleHeightOn = false;
   DoubleTravelOn = false;
-  WalkMethod = false;
+  bJoystickWalkMode = 0;
 }
 
 //==============================================================================
@@ -264,10 +264,10 @@ void CommanderInputController::ControlInput(void)
     boolean fAdjustLegPositions = false;
     short sLegInitXZAdjust = 0;
     short sLegInitAngleAdjust = 0;
-    
+
     if (!g_InControlState.fRobotOn ) {
-        g_InControlState.fRobotOn = true;
-        fAdjustLegPositions = true;
+      g_InControlState.fRobotOn = true;
+      fAdjustLegPositions = true;
     }
 
     // [SWITCH MODES]
@@ -312,26 +312,26 @@ void CommanderInputController::ControlInput(void)
     // We move each pass through this by a percentage of how far we are from center in each direction
     // We get feedback with height by seeing the robot move up and down.  For Speed, I put in sounds
     // which give an idea, but only for those whoes robot has a speaker
-    int rx = command.rightH;
-    int ry = command.rightV;
+    int lx = command.leftH;
+    int ly = command.leftV;
 
     if (command.buttons & BUT_L6 ) {
       // raise or lower the robot on the joystick up /down
       // Maybe should have Min/Max
-      int delta = command.leftV/25;   
+      int delta = command.rightV/25;   
       if (delta) {
         g_BodyYOffset = max(min(g_BodyYOffset + delta, MAX_BODY_Y), 0);
         fAdjustLegPositions = true;
       }
-      
+
       // Also use right Horizontal to manually adjust the initial leg positions.
-      sLegInitXZAdjust = rx/16;        // play with this.
-      sLegInitAngleAdjust = ry/8;
-      rx = 0;
-      ry = 0;
-      
+      sLegInitXZAdjust = lx/16;        // play with this.
+      sLegInitAngleAdjust = ly/8;
+      lx = 0;
+      ly = 0;
+
       // Likewise for Speed control
-      delta = command.leftH / 16;   // 
+      delta = command.rightH / 16;   // 
       if ((delta < 0) && g_InControlState.SpeedControl) {
         if ((word)(-delta) <  g_InControlState.SpeedControl)
           g_InControlState.SpeedControl += delta;
@@ -346,13 +346,13 @@ void CommanderInputController::ControlInput(void)
         MSound( 1, 50, 1000+g_InControlState.SpeedControl); 
       }
 
-      command.leftH = 0; // don't walk when adjusting the speed here...
+      command.rightH = 0; // don't walk when adjusting the speed here...
     }
 
 #ifdef DBGSerial
     if ((command.buttons & BUT_R3) && !(buttonsPrev & BUT_R3)) {
-        MSound(1, 50, 2000);
-        g_fDebugOutput = !g_fDebugOutput;
+      MSound(1, 50, 2000);
+      g_fDebugOutput = !g_fDebugOutput;
     }
 #endif    
     //[Walk functions]
@@ -386,18 +386,35 @@ void CommanderInputController::ControlInput(void)
 
       // Switch between Walk method 1 && Walk method 2
       if ((command.buttons & BUT_R2) && !(buttonsPrev & BUT_R2)) {
-        MSound (1, 50, 2000);
-        WalkMethod = !WalkMethod;
+#ifdef cTurretRotPin
+        if ((++bJoystickWalkMode) > 2)
+#else
+        if ((++bJoystickWalkMode) > 1)
+#endif 
+            bJoystickWalkMode = 0;
+        MSound (1, 50, 2000 + bJoystickWalkMode*250);
       }
 
       //Walking
-      if (WalkMethod)  //(Walk Methode) 
-        g_InControlState.TravelLength.z = (command.leftV); //Right Stick Up/Down  
+      switch (bJoystickWalkMode) {
+      case 0:    
+        g_InControlState.TravelLength.x = -lx;
+        g_InControlState.TravelLength.z = -ly;
+        g_InControlState.TravelLength.y = -(command.rightH)/4; //Right Stick Left/Right 
+        break;
+      case 1:
+        g_InControlState.TravelLength.z = (command.rightV); //Right Stick Up/Down  
+        g_InControlState.TravelLength.y = -(command.rightH)/4; //Right Stick Left/Right 
+        break;
+#ifdef cTurretRotPin
+      case 2:
+        g_InControlState.TravelLength.x = -lx;
+        g_InControlState.TravelLength.z = -ly;
 
-      else
-      {
-        g_InControlState.TravelLength.x = -rx;
-        g_InControlState.TravelLength.z = -ry;
+        // Will use Right now stick to control turret.
+        g_InControlState.TurretRotAngle1 =  max(min(g_InControlState.TurretRotAngle1+command.rightH/5, cTurretRotMax1), cTurretRotMin1);      // Rotation of turret in 10ths of degree
+        g_InControlState.TurretTiltAngle1 =  max(min(g_InControlState.TurretTiltAngle1+command.rightV/5, cTurretTiltMax1), cTurretTiltMin1);  // tilt of turret in 10ths of degree
+#endif
       }
 
       if (!DoubleTravelOn) {  //(Double travel length)
@@ -405,28 +422,27 @@ void CommanderInputController::ControlInput(void)
         g_InControlState.TravelLength.z = g_InControlState.TravelLength.z/2;
       }
 
-      g_InControlState.TravelLength.y = -(command.leftH)/4; //Right Stick Left/Right 
     }
 
     //[Translate functions]
     g_BodyYShift = 0;
     if (ControlMode == TRANSLATEMODE) {
-      g_InControlState.BodyPos.x =  SmoothControl(((rx)*2/3), g_InControlState.BodyPos.x, SmDiv);
-      g_InControlState.BodyPos.z =  SmoothControl(((ry)*2/3), g_InControlState.BodyPos.z, SmDiv);
-      g_InControlState.BodyRot1.y = SmoothControl(((command.leftH)*2), g_InControlState.BodyRot1.y, SmDiv);
+      g_InControlState.BodyPos.x =  SmoothControl(((lx)*2/3), g_InControlState.BodyPos.x, SmDiv);
+      g_InControlState.BodyPos.z =  SmoothControl(((ly)*2/3), g_InControlState.BodyPos.z, SmDiv);
+      g_InControlState.BodyRot1.y = SmoothControl(((command.rightH)*2), g_InControlState.BodyRot1.y, SmDiv);
 
-      //      g_InControlState.BodyPos.x = (rx)/2;
-      //      g_InControlState.BodyPos.z = -(ry)/3;
-      //      g_InControlState.BodyRot1.y = (command.leftH)*2;
-      g_BodyYShift = (-(command.leftV)/2);
+      //      g_InControlState.BodyPos.x = (lx)/2;
+      //      g_InControlState.BodyPos.z = -(ly)/3;
+      //      g_InControlState.BodyRot1.y = (command.rightH)*2;
+      g_BodyYShift = (-(command.rightV)/2);
     }
 
     //[Rotate functions]
     if (ControlMode == ROTATEMODE) {
-      g_InControlState.BodyRot1.x = (ry);
-      g_InControlState.BodyRot1.y = (command.leftH)*2;
-      g_InControlState.BodyRot1.z = (rx);
-      g_BodyYShift = (-(command.leftV)/2);
+      g_InControlState.BodyRot1.x = (ly);
+      g_InControlState.BodyRot1.y = (command.rightH)*2;
+      g_InControlState.BodyRot1.z = (lx);
+      g_BodyYShift = (-(command.rightV)/2);
     }
 #ifdef OPT_GPPLAYER
     //[GPPlayer functions]
@@ -436,13 +452,13 @@ void CommanderInputController::ControlInput(void)
       // Have to keep reminding myself that commander library already subtracted 128...
       if (g_ServoDriver.FIsGPSeqActive() ) {
         if ((g_sGPSMController != 32767)  
-          || (command.leftV > 16) || (command.leftV < -16))
+          || (command.rightV > 16) || (command.rightV < -16))
         {
           // We are in speed modify mode...
-          if (command.leftV >= 0)
-            g_sGPSMController = map(command.leftV, 0, 127, 0, 200);
+          if (command.rightV >= 0)
+            g_sGPSMController = map(command.rightV, 0, 127, 0, 200);
           else  
-            g_sGPSMController = map(command.leftV, -127, 0, -200, 0);
+            g_sGPSMController = map(command.rightV, -127, 0, -200, 0);
           g_ServoDriver.GPSetSpeedMultiplyer(g_sGPSMController);
         }
       }
@@ -486,9 +502,9 @@ void CommanderInputController::ControlInput(void)
           g_InControlState.SelectedLeg=0;
       }
 
-      g_InControlState.SLLeg.x= (byte)((int)rx+128)/2; //Left Stick Right/Left
-      g_InControlState.SLLeg.y= (byte)((int)command.leftV+128)/10; //Right Stick Up/Down
-      g_InControlState.SLLeg.z = (byte)((int)ry+128)/2; //Left Stick Up/Down
+      g_InControlState.SLLeg.x= (byte)((int)lx+128)/2; //Left Stick Right/Left
+      g_InControlState.SLLeg.y= (byte)((int)command.rightV+128)/10; //Right Stick Up/Down
+      g_InControlState.SLLeg.z = (byte)((int)ly+128)/2; //Left Stick Up/Down
 
       // Hold single leg in place
       if ((command.buttons & BUT_RT) && !(buttonsPrev & BUT_RT)) {
@@ -499,26 +515,26 @@ void CommanderInputController::ControlInput(void)
 
 
     //Calculate walking time delay
-    g_InControlState.InputTimeDelay = 128 - max(max(abs(rx), abs(ry)), abs(command.leftH));
+    g_InControlState.InputTimeDelay = 128 - max(max(abs(lx), abs(ly)), abs(command.rightH));
 
     //Calculate g_InControlState.BodyPos.y
     g_InControlState.BodyPos.y = max(g_BodyYOffset + g_BodyYShift,  0);
 
     if (sLegInitXZAdjust || sLegInitAngleAdjust) {
-        // User asked for manual leg adjustment - only do when we have finished any previous adjustment
-        
+      // User asked for manual leg adjustment - only do when we have finished any previous adjustment
+
         if (!g_InControlState.ForceGaitStepCnt) {
-            if (sLegInitXZAdjust)
-                g_fDynamicLegXZLength = true;
-            
-            sLegInitXZAdjust += GetLegsXZLength();  // Add on current length to our adjustment...
-            // Handle maybe change angles...
-            if (sLegInitAngleAdjust) 
-                RotateLegInitAngles(sLegInitAngleAdjust);
-                
-            // Give system time to process previous calls
-            AdjustLegPositions(sLegInitXZAdjust);
-        }
+        if (sLegInitXZAdjust)
+          g_fDynamicLegXZLength = true;
+
+        sLegInitXZAdjust += GetLegsXZLength();  // Add on current length to our adjustment...
+        // Handle maybe change angles...
+        if (sLegInitAngleAdjust) 
+          RotateLegInitAngles(sLegInitAngleAdjust);
+
+        // Give system time to process previous calls
+        AdjustLegPositions(sLegInitXZAdjust);
+      }
     }    
 
     if (fAdjustLegPositions && !g_fDynamicLegXZLength)
@@ -557,6 +573,12 @@ void CommanderTurnRobotOff(void)
   g_BodyYShift = 0;
   g_InControlState.SelectedLeg = 255;
   g_InControlState.fRobotOn = 0;
+
+#ifdef cTurretRotPin
+  g_InControlState.TurretRotAngle1 = cTurretRotInit;      // Rotation of turrent in 10ths of degree
+  g_InControlState.TurretTiltAngle1 = cTurretTiltInit;    // the tile for the turret
+#endif
+
   g_fDynamicLegXZLength = false; // also make sure the robot is back in normal leg init mode...
 }
 
@@ -634,10 +656,10 @@ int Commander::ReadMsgs(){
         }
         else{
           digitalWrite(0, !digitalRead(0));
-          leftV = (signed char)( (int)vals[0]-128 );
-          leftH = (signed char)( (int)vals[1]-128 );
-          rightV = (signed char)( (int)vals[2]-128 );
-          rightH = (signed char)( (int)vals[3]-128 );
+          rightV = (signed char)( (int)vals[0]-128 );
+          rightH = (signed char)( (int)vals[1]-128 );
+          leftV = (signed char)( (int)vals[2]-128 );
+          leftH = (signed char)( (int)vals[3]-128 );
           buttons = vals[4];
           ext = vals[5];
         }
@@ -653,4 +675,8 @@ int Commander::ReadMsgs(){
 }
 //==============================================================================
 //==============================================================================
+
+
+
+
 
