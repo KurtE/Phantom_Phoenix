@@ -23,7 +23,7 @@
 #define cPFConst      512    // half of our 1024 range
 
 
-#include <ax12.h>
+#include "_ax12Serial.h"
 
 #define USE_BIOLOIDEX            // Use the Bioloid code to control the AX12 servos...
 #define USE_AX12_SPEED_CONTROL   // Experiment to see if the speed control works well enough...

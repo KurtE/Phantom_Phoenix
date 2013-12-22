@@ -26,7 +26,7 @@
  *  PROGMEM transition_t name[] = {{NULL,count},{pose_name,1000},...} 
  */
 
-#include <ax12.h>
+#include "_ax12Serial.h"
 
 /* pose engine runs at 30Hz (33ms between frames) 
    recommended values for interpolateSetup are of the form X*BIOLOID_FRAME_LENGTH - 1 */
@@ -68,7 +68,7 @@ class BioloidControllerEx
     unsigned char interpolating;                // are we in an interpolation? 0=No, 1=Yes
     unsigned char runningSeq;                   // are we running a sequence? 0=No, 1=Yes 
     int poseSize;                               // how many servos are in this pose, used by Sync()
-    
+
     // Kurt's Hacks
     uint8_t frameLength;                        // Allow variable frame lengths, to test...
 
