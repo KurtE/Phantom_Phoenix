@@ -1,3 +1,6 @@
+
+// Warning setup to build for standard hexapod or for quad.
+//#define QUAD_MODE  
 //=============================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix software
@@ -27,10 +30,13 @@
 #define DEFINE_HEX_GLOBALS
 #include <Arduino.h>
 #include <EEPROM.h>
-#include <ax12.h>
-
+#ifdef QUAD_MODE
+#include "Quad_Cfg.h"
+#else
 #include "Hex_Cfg.h"
+#endif
 
+#include <ax12.h>
 #include "_Phoenix.h"
 #include "_Phoenix_Input_Commander.h"
 #include "_Phoenix_Driver_AX12.h"

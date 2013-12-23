@@ -22,6 +22,11 @@
 #define cPwmDiv       375  
 #define cPFConst      512    // half of our 1024 range
 
+// Some defines for Voltage processing
+#define VOLTAGE_MIN_TIME_UNTIL_NEXT_INTERPOLATE 4000  // Min time in us Until we should do next interpolation, as to not interfer.
+#define VOLTAGE_MIN_TIME_BETWEEN_CALLS 150      // Max 6+ times per second
+#define VOLTAGE_MAX_TIME_BETWEEN_CALLS 1000    // call at least once per second...
+#define VOLTAGE_TIME_TO_ERROR          3000    // Error out if no valid item is returned in 3 seconds...
 
 #include <ax12.h>
 
@@ -183,9 +188,6 @@ word ServoDriver::GetBatteryVoltage(void) {
 }
 
 #else
-#define VOLTAGE_MIN_TIME_BETWEEN_CALLS 250      // Max 4 times per second
-#define VOLTAGE_MAX_TIME_BETWEEN_CALLS 1000    // call at least once per second...
-#define VOLTAGE_TIME_TO_ERROR          3000    // Error out if no valid item is returned in 3 seconds...
 word g_wLastVoltage = 0xffff;    // save the last voltage we retrieved...
 byte g_bLegVoltage = 0;		// what leg did we last check?
 unsigned long g_ulTimeLastBatteryVoltage;
@@ -193,7 +195,7 @@ unsigned long g_ulTimeLastBatteryVoltage;
 word ServoDriver::GetBatteryVoltage(void) {
   // In this case, we have to ask a servo for it's current voltage level, which is a lot more overhead than simply doing
   // one AtoD operation.  So we will limit when we actually do this to maybe a few times per second.  
-  // Or longer if we are in the process of interpolating...
+  // Also if interpolating, the code will try to only call us when it thinks it won't interfer with timing of interpolation.
   unsigned long ulDeltaTime = millis() - g_ulTimeLastBatteryVoltage;
   if (g_wLastVoltage != 0xffff) {
       if ( (ulDeltaTime < VOLTAGE_MIN_TIME_BETWEEN_CALLS) 
@@ -714,13 +716,13 @@ void  ServoDriver::BackgroundProcess(void)
   if (ServosEnabled) {
     DebugToggle(A3);
 
-    bioloid.interpolateStep(false);    // Do our background stuff...
+    int iTimeToNextInterpolate = bioloid.interpolateStep(false);    // Do our background stuff...
     
     // Hack if we are not interpolating, maybe try to get voltage.  This will acutally only do this
     // a few times per second.
 #ifdef cTurnOffVol          // only do if we a turn off voltage is defined
 #ifndef cVoltagePin         // and we are not doing AtoD type of conversion...
-    if (!bioloid.interpolating )
+    if (iTimeToNextInterpolate > VOLTAGE_MIN_TIME_UNTIL_NEXT_INTERPOLATE )      // At least 4ms until next interpolation.  See how this works...
         GetBatteryVoltage();
 #endif    
 #endif

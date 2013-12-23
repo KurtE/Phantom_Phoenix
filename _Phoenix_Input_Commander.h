@@ -84,7 +84,7 @@ enum {
   NORM_NORM=0, NORM_LONG, HIGH_NORM, HIGH_LONG};
 
 
-#define cTravelDeadZone 4      //The deadzone for the analog input from the remote
+#define cTravelDeadZone 6      //The deadzone for the analog input from the remote
 
 #define ARBOTIX_TO  1250        // if we don't get a valid message in this number of mills turn off
 
