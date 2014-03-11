@@ -1,3 +1,5 @@
+//#define DEBUG_COMMANDER
+
 //====================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix, control file.
@@ -90,6 +92,9 @@ enum {
 
 #ifndef XBeeSerial
 SoftwareSerial XBeeSerial(cXBEE_IN, cXBEE_OUT);
+#endif
+#ifndef USER
+#define USER 13
 #endif
 
 //=============================================================================
@@ -232,6 +237,10 @@ void CommanderInputController::Init(void)
 {
   g_BodyYOffset = 0;
   g_BodyYShift = 0;
+#ifdef DBGSerial  
+  DBGSerial.print("Commander Init: ");
+  DBGSerial.println(XBEE_BAUD, DEC);
+#endif  
   command.begin(XBEE_BAUD);
   GPSeq = 0;  // init to something...
 
@@ -389,7 +398,7 @@ void CommanderInputController::ControlInput(void)
 #ifdef cTurretRotPin
         if ((++bJoystickWalkMode) > 2)
 #else
-        if ((++bJoystickWalkMode) > 1)
+          if ((++bJoystickWalkMode) > 1)
 #endif 
             bJoystickWalkMode = 0;
         MSound (1, 50, 2000 + bJoystickWalkMode*250);
@@ -619,7 +628,82 @@ Commander::Commander(){
 // Commander::begin 
 //==============================================================================
 void Commander::begin(unsigned long baud){
+  char ab[10];
+  // Sometimes when we power up the XBee comes up at 9600 in command mode
+  // There is an OK<cr>.  So check for this and try to exit
+  XBeeSerial.begin(9600);  
+  XBeeSerial.println(F("ATCN"));  // Tell it to bail quickly
+  delay(25);
+  XBeeSerial.end();
+  delay(25);
   XBeeSerial.begin(baud);
+  pinMode(USER, OUTPUT);
+#ifdef CHECK_AND_CONFIG_XBEE
+  while (XBeeSerial.read() != -1)
+    ;  // flush anything out...
+  // First lets see if we have a real short command time
+  delay(15);  // see if we have fast command mode enabled.
+  XBeeSerial.print(F("+++")); 
+  XBeeSerial.flush();
+  XBeeSerial.setTimeout(20);  // give a little extra time
+  if (XBeeSerial.readBytesUntil('\r', ab, 10) > 0) {
+    XBeeSerial.println(F("ATCN"));	          // and exit command mode
+    return;  // bail out quick
+  }
+  // Else see if maybe properly configured but not quick command mode.
+  delay(1100);
+  while (XBeeSerial.read() != -1)
+    ;  // flush anything out...
+  XBeeSerial.print(F("+++"));
+  XBeeSerial.setTimeout(1100);  // little over a second
+  if (XBeeSerial.readBytesUntil('\r', ab, 10) > 0) {
+    // Note: we could check a few more things here if we run into issues.  Like: MY!=0
+    // or MY != DL
+    XBeeSerial.println(F("ATGT 5"));              // Set a quick command mode
+    XBeeSerial.println(F("ATWR"));	          // Write out the changes
+    XBeeSerial.println(F("ATCN"));	          // and exit command mode
+    return;  // It is already at 38400, so assume already init.
+  }
+  // Failed, so check to see if we can communicate at 9600
+  XBeeSerial.end();
+  XBeeSerial.begin(9600);
+  while (XBeeSerial.read() != -1)
+    ;  // flush anything out...
+
+  delay(1100);
+  XBeeSerial.print(F("+++"));
+  if (XBeeSerial.readBytesUntil('\r', ab, 10) == 0) {
+    // failed blink fast
+    for(int i=0;i<50;i++) {
+      digitalWrite(USER, !digitalRead(USER));
+      delay(50);
+    }  // Loop awhile
+  } 
+  else {
+    // So we entered command mode, lets set the appropriate stuff. 
+    XBeeSerial.println(F("ATBD 5"));  // 38400
+    XBeeSerial.print(F("ATID "));
+    XBeeSerial.println(DEFAULT_ID, HEX);
+
+    XBeeSerial.print(F("ATMY "));
+    XBeeSerial.println(DEFAULT_MY, HEX);
+
+    XBeeSerial.println(F("ATDH 0"));
+    XBeeSerial.print(F("ATDL "));
+    XBeeSerial.println(DEFAULT_DL, HEX);
+
+    XBeeSerial.println(F("ATGT 5"));    // Set a quick command mode
+    XBeeSerial.println(F("ATWR"));	// Write out the changes
+    XBeeSerial.println(F("ATCN"));	// and exit command mode
+    XBeeSerial.flush();              // make sure all has been output
+    // lets do a quick and dirty test
+    delay(250);  // Wait a bit for responses..
+  }
+  XBeeSerial.end();
+  delay(10);
+  XBeeSerial.begin(38400);
+#endif  
+
 }
 
 //==============================================================================
@@ -630,7 +714,6 @@ void Commander::begin(unsigned long baud){
  *  format = 0xFF RIGHT_H RIGHT_V LEFT_H LEFT_V BUTTONS EXT CHECKSUM */
 int Commander::ReadMsgs(){
   while(XBeeSerial.available() > 0){
-    //		digitalWrite(0, !digitalRead(0));
     if(index == -1){         // looking for new packet
       if(XBeeSerial.read() == 0xff){
         index = 0;
@@ -650,23 +733,44 @@ int Commander::ReadMsgs(){
       index++;
       if(index == 7){ // packet complete
         if(checksum%256 != 255){
+#ifdef DEBUG_COMMANDER
+#ifdef DBGSerial  
+          if (g_fDebugOutput) {
+            DBGSerial.println("Packet Error");
+          }
+#endif          
+#endif
           // packet error!
           index = -1;
           return 0;
         }
         else{
-          digitalWrite(0, !digitalRead(0));
+          digitalWrite(USER, digitalRead(USER)? LOW : HIGH);
           rightV = (signed char)( (int)vals[0]-128 );
           rightH = (signed char)( (int)vals[1]-128 );
           leftV = (signed char)( (int)vals[2]-128 );
           leftH = (signed char)( (int)vals[3]-128 );
           buttons = vals[4];
           ext = vals[5];
+#ifdef DEBUG_COMMANDER
+#ifdef DBGSerial  
+          if (g_fDebugOutput) {
+            DBGSerial.print(buttons, HEX);
+            DBGSerial.print(" : ");
+            DBGSerial.print(rightV, DEC);
+            DBGSerial.print(" ");
+            DBGSerial.print(rightH, DEC);
+            DBGSerial.print(" ");
+            DBGSerial.print(leftV, DEC);
+            DBGSerial.print(" ");
+            DBGSerial.println(leftH, DEC);
+          }
+#endif
+#endif
         }
         index = -1;
         while (XBeeSerial.read() != -1)
           ;
-        //XBeeSerial.flush();  ' Not the same on Arduino 1.0+
         return 1;
       }
     }
@@ -675,6 +779,7 @@ int Commander::ReadMsgs(){
 }
 //==============================================================================
 //==============================================================================
+
 
 
 

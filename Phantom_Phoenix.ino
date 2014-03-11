@@ -1,6 +1,6 @@
 
 // Warning setup to build for standard hexapod or for quad.
-//#define QUAD_MODE  
+#define QUAD_MODE  
 //=============================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix software
@@ -30,6 +30,7 @@
 #define DEFINE_HEX_GLOBALS
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <avr\pgmspace.h>
 #ifdef QUAD_MODE
 #include "Quad_Cfg.h"
 #else
@@ -38,6 +39,16 @@
 
 #include <ax12.h>
 #include "_Phoenix.h"
+
+#ifdef QUAD_MODE
+#define ADD_GAITS
+#define PYPOSE_GAIT_SPEED 98
+PHOENIXGAIT APG_EXTRA[] = { 
+  {PYPOSE_GAIT_SPEED, 8, 2, 1, 2, 6, 1, 0, 0,0, true, {7, 1, 3, 5}},   // ripple
+  {PYPOSE_GAIT_SPEED, 4, 2, 1, 2, 2, 1, 0, 0, 0, true,{3, 1, 1, 3}},  // Amble
+  {PYPOSE_GAIT_SPEED, 6, 3, 2, 2, 3, 2, 0, 0,0, true, {1, 4, 4, 1}} }; // Smooth Amble 
+#endif+369
+
 #include "_Phoenix_Input_Commander.h"
 #include "_Phoenix_Driver_AX12.h"
 #include "_Phoenix_Code.h"

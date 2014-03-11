@@ -133,13 +133,16 @@ extern void MakeSureServosAreOn(void);
 extern void DoPyPose(byte *psz);
 extern void EEPROMReadData(word wStart, uint8_t *pv, byte cnt);
 extern void EEPROMWriteData(word wStart, uint8_t *pv, byte cnt);
+extern void TCSetServoID(byte *psz);
+extern void SetRegOnAllServos(uint8_t bReg, uint8_t bVal);
+
 
 //--------------------------------------------------------------------
 //Init
 //--------------------------------------------------------------------
 void ServoDriver::Init(void) {
   // First lets get the actual servo positions for all of our servos...
-  pinMode(0, OUTPUT);
+  //  pinMode(0, OUTPUT);
   g_fServosFree = true;
   bioloid.poseSize = NUMSERVOS;
   bioloid.readPose();
@@ -160,8 +163,11 @@ void ServoDriver::Init(void) {
 #ifdef cTurretRotPin
   bioloid.setId(FIRSTTURRETPIN, cTurretRotPin);
   bioloid.setId(FIRSTTURRETPIN+1, cTurretTiltPin);
-
 #endif
+
+  // Added - try to speed things up later if we do a query...
+  SetRegOnAllServos(AX_RETURN_DELAY_TIME, 0);  // tell servos to give us back their info as quick as they can...
+
 }
 
 
@@ -183,8 +189,11 @@ word ServoDriver::GetBatteryVoltage(void) {
   g_awVoltages[g_iVoltages] = analogRead(cVoltagePin);
   g_wVoltageSum += g_awVoltages[g_iVoltages];
 
+#ifdef CVREF
+  return ((long)((long)g_wVoltageSum*CVREF*(CVADR1+CVADR2))/(long)(8192*(long)CVADR2));  
+#else
   return ((long)((long)g_wVoltageSum*125*(CVADR1+CVADR2))/(long)(2048*(long)CVADR2));  
-
+#endif
 }
 
 #else
@@ -639,17 +648,47 @@ void ServoDriver::CommitServoDriver(word wMoveTime)
   g_InputController.AllowControllerInterrupts(true);    
 
 }
+//--------------------------------------------------------------------
+//[SetRegOnAllServos] Function that is called to set the state of one
+//  register in all of the servos, like Torque on...
+//--------------------------------------------------------------------
+void SetRegOnAllServos(uint8_t bReg, uint8_t bVal)
+{
+  // Need to first output the header for the Sync Write
+  int length = 4 + (NUMSERVOS * 2);   // 2 = id + val
+  int checksum = 254 + length + AX_SYNC_WRITE + 1 + bReg;
+  setTXall();
+  ax12write(0xFF);
+  ax12write(0xFF);
+  ax12write(0xFE);
+  ax12write(length);
+  ax12write(AX_SYNC_WRITE);
+  ax12write(bReg);
+  ax12write(1);    // number of bytes per servo (plus the ID...)
+  for (int i = 0; i < NUMSERVOS; i++) {
+    byte id = pgm_read_byte(&cPinTable[i]);
+    checksum += id + bVal;
+    ax12write(id);
+    ax12write(bVal);
+
+  }
+  ax12write(0xff - (checksum % 256));
+  setRX(0);
+}
 
 //--------------------------------------------------------------------
 //[FREE SERVOS] Frees all the servos
 //--------------------------------------------------------------------
 void ServoDriver::FreeServos(void)
 {
-  if (ServosEnabled) {
+  if (!g_fServosFree) {
     g_InputController.AllowControllerInterrupts(false);    // If on xbee on hserial tell hserial to not processess...
+    SetRegOnAllServos(AX_TORQUE_ENABLE, 0);  // do this as one statement...
+#if 0    
     for (byte i = 0; i < NUMSERVOS; i++) {
       Relax(pgm_read_byte(&cPinTable[i]));
     }
+#endif
     g_InputController.AllowControllerInterrupts(true);    
     g_fServosFree = true;
   }
@@ -696,9 +735,13 @@ void MakeSureServosAreOn(void)
       bioloid.readPose();
     }
 
+    SetRegOnAllServos(AX_TORQUE_ENABLE, 1);  // Use sync write to do it.
+
+#if 0
     for (byte i = 0; i < NUMSERVOS; i++) {
       TorqueOn(pgm_read_byte(&cPinTable[i]));
     }
+#endif    
     g_InputController.AllowControllerInterrupts(true);    
     g_fServosFree = false;
   }   
@@ -737,10 +780,12 @@ void  ServoDriver::BackgroundProcess(void)
 //==============================================================================
 void ServoDriver::ShowTerminalCommandList(void) 
 {
+  DBGSerial.println(F("V - Voltage"));
   DBGSerial.println(F("M - Toggle Motors on or off"));
   DBGSerial.println(F("F<frame length> - FL in ms"));    // BUGBUG:: 
   DBGSerial.println(F("A - Toggle AX12 speed control"));
   DBGSerial.println(F("T - Test Servos"));
+  DBGSerial.println(F("S - Set id <frm> <to"));
 #ifdef OPT_PYPOSE
   DBGSerial.println(F("P<DL PC> - Pypose"));
 #endif
@@ -764,17 +809,29 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
 
     return true;  
   } 
+  if ((bLen == 1) && ((*psz == 'v') || (*psz == 'V'))) {
+    DBGSerial.print(F("Voltage: "));
+    DBGSerial.println(GetBatteryVoltage(), DEC);
+    DBGSerial.print("Raw Analog: ");
+    DBGSerial.println(analogRead(cVoltagePin));
+
+    DBGSerial.print(F("From Servo 2: "));
+    DBGSerial.println(ax12GetRegister (2, AX_PRESENT_VOLTAGE, 1), DEC);    
+  }
 
   if ((bLen == 1) && ((*psz == 't') || (*psz == 'T'))) {
     // Test to see if all servos are responding...
     for(int i=1;i<=NUMSERVOS;i++){
-      word w;
-      w = ax12GetRegister(i,AX_PRESENT_POSITION_L,2);
+      int iPos;
+      iPos = ax12GetRegister(i,AX_PRESENT_POSITION_L,2);
       DBGSerial.print(i,DEC);
       DBGSerial.print(F("="));
-      DBGSerial.println(w, DEC);
+      DBGSerial.println(iPos, DEC);
       delay(25);   
     }
+  }
+  if ((*psz == 't') || (*psz == 'T')) {
+    TCSetServoID(++psz);
   }
 
   if ((bLen == 1) && ((*psz == 'a') || (*psz == 'A'))) {
@@ -805,17 +862,36 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
     FindServoOffsets();
   }
 #endif
-#ifdef OPT_PYPOSE
-  else if ((*psz == 'p') || (*psz == 'P')) {
-    DoPyPose(++psz);
-  }
-#endif
    return false;
 
 }
+
+//==============================================================================
+// TCSetServoID - debug function to update servo numbers.
+//==============================================================================
+extern word GetCmdLineNum(byte **ppszCmdLine);
+void TCSetServoID(byte *psz)
+{
+  word wFrom = GetCmdLineNum(&psz);
+  word wTo = GetCmdLineNum(&psz);
+
+  if (wFrom  && wTo) {
+    // Both specified, so lets try
+    DBGSerial.print("Change Servo from: ");
+    DBGSerial.print(wFrom, DEC);
+    DBGSerial.print(" ");
+    DBGSerial.print(wTo, DEC);
+    ax12SetRegister(wFrom, AX_ID, wTo);
+    if (ax12ReadPacket(6)) { // get the response...    
+      DBGSerial.print(" Resp: ");
+      DBGSerial.println(ax_rx_buffer[4], DEC);
+    } 
+    else
+      DBGSerial.println(" failed");
+  }
+}
+
 #endif    
-
-
 
 //==============================================================================
 //	FindServoOffsets - Find the zero points for each of our servos... 
@@ -954,7 +1030,7 @@ void DoPyPose(byte *psz)
       if(mode == 0){         // start of new packet
         if(Serial.read() == 0xff){
           mode = 2;
-          digitalWrite(0,HIGH-digitalRead(0));
+//          digitalWrite(0,HIGH-digitalRead(0));
         }
         //}else if(mode == 1){   // another start byte
         //    if(Serial.read() == 0xff)
