@@ -49,6 +49,7 @@
 // Debug Options
 #ifdef DBGSerial
 #define OPT_TERMINAL_MONITOR  
+#define OPT_TERMINAL_MONITOR_IC    // Allow the input controller to define stuff as well
 //#define OPT_FIND_SERVO_OFFSETS    // Only useful if terminal monitor is enabled
 //#define OPT_PYPOSE
 #endif
@@ -93,6 +94,7 @@
 #define SOUND_PIN    6
 #else
 #define SOUND_PIN    1 //0xff        // Tell system we have no IO pin...
+#define USER 0                        // defaults to 13 but Arbotix on 0...
 #endif
 
 // Define Analog pin and minimum voltage that we will allow the servos to run
@@ -110,7 +112,7 @@
 #define cTurnOnVol   1100     // 11V - optional part to say if voltage goes back up, turn it back on...
 
 //====================================================================
-#define  DEFAULT_GAIT_SPEED 50  // Default gait speed  - Will depend on what Servos you are using...
+#define  DEFAULT_GAIT_SPEED 35  // Default gait speed  - Will depend on what Servos you are using...
 #define  DEFAULT_SLOW_GAIT  50  // Had a couple different speeds...
 
 //====================================================================
@@ -120,7 +122,6 @@
 #define DEFAULT_MY 0x101  // Swap My/DL on 2nd unit
 #define DEFAULT_DL 0x102
 #define DEFAULT_ID 0x3332
-//#define USER 0    // defaults to 13 but Arbotix on 0...
 
 //--------------------------------------------------------------------
 // Define which pins(sevo IDS go with which joint
@@ -287,7 +288,7 @@
 #define CNT_HEX_INITS 2
 #define MAX_BODY_Y  150
 #ifdef DEFINE_HEX_GLOBALS
-const byte g_abHexIntXZ[] PROGMEM = {cHexInitXZ, 134};
+const byte g_abHexIntXZ[] PROGMEM = {cHexInitXZ, 142};
 const byte g_abHexMaxBodyY[] PROGMEM = { 20, MAX_BODY_Y};
 #else
 extern const byte g_abHexIntXZ[] PROGMEM;

@@ -1,6 +1,6 @@
 
 // Warning setup to build for standard hexapod or for quad.
-#define QUAD_MODE  
+//#define QUAD_MODE  
 //=============================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix software

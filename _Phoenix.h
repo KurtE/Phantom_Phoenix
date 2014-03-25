@@ -4,7 +4,7 @@
 //
 //Programmer: Jeroen Janssen [aka Xan]
 //         Kurt Eckhardt(KurtE) converted to C and Arduino
-//   Kï¿½re Halvorsen aka Zenta - Makes everything work correctly!     
+//   Kare Halvorsen aka Zenta - Makes everything work correctly!     
 //
 // This version of the Phoenix code was ported over to the Arduino Environement
 //
@@ -144,6 +144,11 @@ public:
   virtual void     Init(void);
   virtual void     ControlInput(void);
   virtual void     AllowControllerInterrupts(boolean fAllow);
+
+#ifdef OPT_TERMINAL_MONITOR_IC  // Allow Input controller to define stuff as well
+  void            ShowTerminalCommandList(void);
+  boolean         ProcessTerminalCommand(byte *psz, byte bLen);
+#endif
 
 private:
 } 

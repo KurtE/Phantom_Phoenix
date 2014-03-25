@@ -334,7 +334,7 @@ void CommanderInputController::ControlInput(void)
       }
 
       // Also use right Horizontal to manually adjust the initial leg positions.
-      sLegInitXZAdjust = lx/16;        // play with this.
+      sLegInitXZAdjust = lx/10;        // play with this.
       sLegInitAngleAdjust = ly/8;
       lx = 0;
       ly = 0;
@@ -590,7 +590,70 @@ void CommanderTurnRobotOff(void)
 
   g_fDynamicLegXZLength = false; // also make sure the robot is back in normal leg init mode...
 }
+//================================================================================
+#ifdef OPT_TERMINAL_MONITOR_IC
+// Optional stuff to allow me to have Input device debug support
+//==============================================================================
+// ShowTerminalCommandList: Allow the Terminal monitor to call the servo driver
+//      to allow it to display any additional commands it may have.
+//==============================================================================
+void CommanderInputController::ShowTerminalCommandList(void) 
+{
+  DBGSerial.println(F("X - Show XBee Info"));
+}
 
+//==============================================================================
+// ProcessTerminalCommand: The terminal monitor will call this to see if the
+//     command the user entered was one added by the servo driver.
+//==============================================================================
+void PrintXBeeIDInfo(char *pszID) {
+  char ab[20];
+  int cbRead;
+  while (XBeeSerial.read() != -1)
+    ;  // Flush out anything still pending. 
+  XBeeSerial.print("AT");  
+  XBeeSerial.println(pszID);  // Lets print out the ID;
+  XBeeSerial.flush();
+  cbRead = XBeeSerial.readBytesUntil('\r', ab, sizeof(ab));
+  if (cbRead) {
+    DBGSerial.print(pszID);
+    DBGSerial.print(": ");
+    DBGSerial.write(ab, cbRead);
+    DBGSerial.println();
+  }
+}  
+
+boolean CommanderInputController::ProcessTerminalCommand(byte *psz, byte bLen)
+{
+  if ((bLen == 1) && ((*psz == 'x') || (*psz == 'X'))) {
+    char ab[10];
+    int cbRead;
+    delay(15);  // see if we have fast command mode enabled.
+    XBeeSerial.print(F("+++")); 
+    XBeeSerial.flush();
+    XBeeSerial.setTimeout(20);  // give a little extra time
+    if (XBeeSerial.readBytesUntil('\r', ab, 10) > 0) {
+      // Ok we entered command mode, lets print out a few things about the XBee
+      PrintXBeeIDInfo("MY");
+      PrintXBeeIDInfo("DL");
+      PrintXBeeIDInfo("ID");
+      PrintXBeeIDInfo("EA");
+      PrintXBeeIDInfo("EC");
+
+      XBeeSerial.println("ATCN");  // exit command mode
+      cbRead = XBeeSerial.readBytesUntil('\r', ab, sizeof(ab));
+    } 
+    else {
+      DBGSerial.println("XBee Failed to enter command mode");
+    }    
+
+    return true;  
+  } 
+  return false;
+
+}
+#endif
+//===============================================================================
 
 //==============================================================================
 // The below class code is based on the commander class by Michael Ferguson... 
@@ -631,11 +694,13 @@ void Commander::begin(unsigned long baud){
   char ab[10];
   // Sometimes when we power up the XBee comes up at 9600 in command mode
   // There is an OK<cr>.  So check for this and try to exit
+#ifdef NOT_SURE_WHY_NEEDED_SOMETIMES
   XBeeSerial.begin(9600);  
   XBeeSerial.println(F("ATCN"));  // Tell it to bail quickly
   delay(25);
   XBeeSerial.end();
   delay(25);
+#endif  
   XBeeSerial.begin(baud);
   pinMode(USER, OUTPUT);
 #ifdef CHECK_AND_CONFIG_XBEE

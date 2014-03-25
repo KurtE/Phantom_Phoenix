@@ -5,7 +5,7 @@
 //Date: 29-10-2009
 //Programmer: Jeroen Janssen [aka Xan]
 //         Kurt Eckhardt(KurtE) converted to C and Arduino
-//   KÃ¥re Halvorsen aka Zenta - Makes everything work correctly!     
+//   Kåre Halvorsen aka Zenta - Makes everything work correctly!     
 //
 // This version of the Phoenix code was ported over to the Arduino Environement
 // and is specifically configured for the Lynxmotion BotBoarduino 
@@ -2186,6 +2186,10 @@ boolean TerminalMonitor(void)
     DBGSerial.println(F("B <percent>"));
     DBGSerial.println(F("G ST NL RR RF LR LF"));
 #endif
+#ifdef OPT_TERMINAL_MONITOR_IC    // Allow the input controller to define stuff as well
+    g_InputController.ShowTerminalCommandList(); 
+#endif      
+
     // Let the Servo driver show it's own set of commands...
     g_ServoDriver.ShowTerminalCommandList();
     g_fShowDebugPrompt = false;
@@ -2203,12 +2207,22 @@ boolean TerminalMonitor(void)
       szCmdLine[ich] = ch;
     }
     szCmdLine[ich] = '\0';    // go ahead and null terminate it...
+    
+    // Remove any extra EOL characters that may have been added
+    for (;;) {
+      ch = DBGSerial.peek();
+      if ((ch >= 10) && (ch <= 15))
+        DBGSerial.read();
+      else
+        break;
+    }
+    if (ich) {
     DBGSerial.print(F("Serial Cmd Line:"));        
     DBGSerial.write(szCmdLine, ich);
     DBGSerial.println(F("<eol>"));
-
+    }
     // So see what are command is.
-    if (ich == 0) {
+    if (!ich)  {
       g_fShowDebugPrompt = true;
     } 
     else if ((ich == 1) && ((szCmdLine[0] == 'd') || (szCmdLine[0] == 'D'))) {
@@ -2228,6 +2242,11 @@ boolean TerminalMonitor(void)
       UpdateGaitCmd(szCmdLine);
     } 
 #endif
+#ifdef OPT_TERMINAL_MONITOR_IC    // Allow the input controller to define stuff as well
+    else if (g_InputController.ProcessTerminalCommand(szCmdLine, ich)) 
+      ;  // See if the Input controller has added commands...
+#endif      
+
     else
     {
       g_ServoDriver.ProcessTerminalCommand(szCmdLine, ich);
