@@ -60,6 +60,9 @@
 #ifdef QUADMODE
 enum {
   cRR=0, cRF, cLR, cLF, CNT_LEGS};
+#elif defined(OCTOMODE)
+enum {
+  cRR=0, cRMR, cRMF, cRF, cLR, cLMR, cLMF, cLF, CNT_LEGS};
 #else
 enum {
   cRR=0, cRM, cRF, cLR, cLM, cLF, CNT_LEGS};
