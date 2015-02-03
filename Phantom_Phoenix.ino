@@ -2,7 +2,8 @@
 // Warning setup to build for standard hexapod, octopod, or for quad.
 //  #define QUADMODE
 //  #define HEXMODE
-#define OCTOMODE
+//  #define OCTOMODE
+//  #define DISPLAY_GAIT_NAMES
 //=============================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix software

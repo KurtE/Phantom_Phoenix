@@ -823,8 +823,10 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
   if ((bLen == 1) && ((*psz == 'v') || (*psz == 'V'))) {
     DBGSerial.print(F("Voltage: "));
     DBGSerial.println(GetBatteryVoltage(), DEC);
+#ifdef cVoltagePin 
     DBGSerial.print("Raw Analog: ");
     DBGSerial.println(analogRead(cVoltagePin));
+#endif
 
     DBGSerial.print(F("From Servo 2: "));
     DBGSerial.println(ax12GetRegister (2, AX_PRESENT_VOLTAGE, 1), DEC);    
