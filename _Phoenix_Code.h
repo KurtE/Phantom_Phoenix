@@ -1221,9 +1221,14 @@ void SingleLegControl(void)
   AllDown = (LegPosY[cRF]==(short)pgm_read_word(&cInitPosY[cRF])) && 
     (LegPosY[cRR]==(short)pgm_read_word(&cInitPosY[cRR])) && 
     (LegPosY[cLR]==(short)pgm_read_word(&cInitPosY[cLR])) && 
-#ifndef QUADMODE
+#ifdef HEXMODE
     (LegPosY[cRM]==(short)pgm_read_word(&cInitPosY[cRM])) && 
     (LegPosY[cLM]==(short)pgm_read_word(&cInitPosY[cLM])) && 
+#elif defined(OCTOMODE)
+    (LegPosY[cRMR]==(short)pgm_read_word(&cInitPosY[cRMR])) && 
+    (LegPosY[cRMF]==(short)pgm_read_word(&cInitPosY[cRMF])) && 
+    (LegPosY[cLMR]==(short)pgm_read_word(&cInitPosY[cLMR])) && 
+    (LegPosY[cLMF]==(short)pgm_read_word(&cInitPosY[cLMF])) && 
 #endif  
     (LegPosY[cLF]==(short)pgm_read_word(&cInitPosY[cLF]));
 
