@@ -69,6 +69,15 @@ static const byte cPinTable[] PROGMEM = {
   , cTurretRotPin, cTurretTiltPin
 #endif
 };
+#elif defined(OCTOMODE)
+static const byte cPinTable[] PROGMEM = {
+  cRRCoxaPin,  cRMRCoxaPin,  cRMFCoxaPin,  cRFCoxaPin,  cLRCoxaPin,   cLMRCoxaPin,  cLMFCoxaPin,  cLFCoxaPin, 
+  cRRFemurPin, cRMRFemurPin, cRMFFemurPin, cRFFemurPin, cLRFemurPin,  cLMRFemurPin, cLMFFemurPin, cLFFemurPin,
+  cRRTibiaPin, cRMRTibiaPin, cRMFTibiaPin, cRFTibiaPin, cLRTibiaPin,  cLMRTibiaPin, cLMFTibiaPin, cLFTibiaPin
+#ifdef c4DOF
+   ,cRRTarsPin, cRMRTarsPin, cRMFTarsPin,  cRFTarsPin, cLRTarsPin, cLMRTarsPin, cLMFTarsPin, cLFTarsPin
+#endif
+};
 #else
 static const byte cPinTable[] PROGMEM = {
   cRRCoxaPin,  cRMCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLMCoxaPin,  cLFCoxaPin, 
