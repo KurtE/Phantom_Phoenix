@@ -635,7 +635,8 @@ boolean        fRobotUpsideDownPrev;
 //cRR=0, cRF, cLR, cLF, CNT_LEGS};
 
 #ifndef OVERWRITE_GAITS
-#ifndef QUADMODE
+#ifdef HEXMODE
+// Hex Gaits
 //  Speed, Steps, Lifted, Front Down, Lifted Factor, Half Height, On Ground, 
 //     Quad extra: COGAngleStart, COGAngleStep, CogRadius, COGCCW
 //                      { RR, <RM> RF, LR, <LM>, LF}
@@ -660,7 +661,24 @@ PHOENIXGAIT APG[] = {
     {DEFAULT_GAIT_SPEED, 6, 2, 1, 2, 4, 1, {1, 4, 1, 4, 1, 4} GATENAME(s_szGN6)}          //Tripod 6 steps
 };    
 
+#elif defined(OCTOMODE)
+// Octopod Gaits
+
+//  Speed, Steps, Lifted, Front Down, Lifted Factor, Half Height, On Ground, 
+//                      { RR, RMR, RMF, RF, LR, LMR, LMF, LF}
+#ifdef DISPLAY_GAIT_NAMES
+extern "C" {
+  // Move the Gait Names to program space...
+  const char s_szGN1[] PROGMEM = "Tripod 6";
+};  
+#endif
+
+PHOENIXGAIT APG[] = { 
+    {DEFAULT_GAIT_SPEED, 6, 2, 1, 2, 4, 1, {1, 4, 1, 4, 4, 1, 4, 1} GATENAME(s_szGN1)}          //Tripod 6 steps
+};
+
 #else
+// Quad Gaits
 #ifdef DISPLAY_GAIT_NAMES
 extern "C" {
   // Move the Gait Names to program space...
