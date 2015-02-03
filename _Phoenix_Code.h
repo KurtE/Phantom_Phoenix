@@ -174,7 +174,7 @@ static const word GetSin[] PROGMEM = {
 #endif
 
 
-#ifndef QUADMODE
+#ifdef HEXMODE
 // Standard Hexapod...
 // Servo Horn offsets
 #ifdef cRRFemurHornOffset1   // per leg configuration
