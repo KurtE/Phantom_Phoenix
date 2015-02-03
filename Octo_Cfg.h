@@ -382,5 +382,25 @@ extern const byte g_abHexMaxBodyY[] PROGMEM;
 #define cTarsFactorB	60	//4DOF ONLY
 #define cTarsFactorC	50	//4DOF ONLY
 
+#define cRMRCoxaInv 1 
+#define cRMFCoxaInv 1 
+#define cLMRCoxaInv 0 
+#define cLMFCoxaInv 0 
+
+#define cRMRFemurInv 1 
+#define cRMFFemurInv 1 
+#define cLMRFemurInv 0 
+#define cLMFFemurInv 0 
+
+#define cRMRTibiaInv 1 
+#define cRMFTibiaInv 1 
+#define cLMRTibiaInv 0 
+#define cLMFTibiaInv 0 
+
+#define cRMRTarsInv 1 
+#define cRMFTarsInv 1 
+#define cLMRTarsInv 0 
+#define cLMFTarsInv 0 
+
 #endif // OCTO_CFG_H
 

@@ -281,6 +281,113 @@ const short cInitPosZ[] PROGMEM = {
   cRRInitPosZ, cRMInitPosZ, cRFInitPosZ, cLRInitPosZ, cLMInitPosZ, cLFInitPosZ};
 
 //=============================================================================
+#elif defined(OCTOMODE)
+// Octopods
+// Servo Horn offsets
+#ifdef cRRFemurHornOffset1   // per leg configuration
+static const short cFemurHornOffset1[] PROGMEM = {
+  cRRFemurHornOffset1, cRMRFemurHornOffset1, cRMFFemurHornOffset1, cRFFemurHornOffset1, cLRFemurHornOffset1, cLMRFemurHornOffset1, cLMFFemurHornOffset1, cLFFemurHornOffset1};
+#define CFEMURHORNOFFSET1(LEGI) ((short)pgm_read_word(&cFemurHornOffset1[LEGI]))
+#else   // Fixed per leg, if not defined 0
+#ifndef cFemurHornOffset1
+#define cFemurHornOffset1  0
+#endif
+#define CFEMURHORNOFFSET1(LEGI)  (cFemurHornOffset1)
+#endif
+
+#ifdef cRRTibiaHornOffset1   // per leg configuration
+static const short cTibiaHornOffset1[] PROGMEM = {
+  cRRTibiaHornOffset1, cRMRTibiaHornOffset1, cRMFTibiaHornOffset1, cRFTibiaHornOffset1, cLRTibiaHornOffset1, cLMRTibiaHornOffset1, cLMFTibiaHornOffset1, cLFTibiaHornOffset1};
+#define CTIBIAHORNOFFSET1(LEGI) ((short)pgm_read_word(&cTibiaHornOffset1[LEGI]))
+#else   // Fixed per leg, if not defined 0
+#ifndef cTibiaHornOffset1
+#define cTibiaHornOffset1  0
+#endif
+#define CTIBIAHORNOFFSET1(LEGI)  (cTibiaHornOffset1)
+#endif
+
+#ifdef c4DOF
+#ifdef cRRTarsHornOffset1   // per leg configuration
+static const short cTarsHornOffset1[] PROGMEM = {
+  cRRTarsHornOffset1,  cRMRTarsHornOffset1,  cRMFTarsHornOffset1,  cRFTarsHornOffset1,  cLRTarsHornOffset1,  cLMRTarsHornOffset1,  cLMFTarsHornOffset1,  cLFTarsHornOffset1};
+#define CTARSHORNOFFSET1(LEGI) ((short)pgm_read_word(&cTarsHornOffset1[LEGI]))
+#else   // Fixed per leg, if not defined 0
+#ifndef cTarsHornOffset1
+#define cTarsHornOffset1  0
+#endif
+#define CTARSHORNOFFSET1(LEGI)  cTarsHornOffset1
+#endif
+#endif
+
+//Min / Max values
+#ifndef SERVOS_DO_MINMAX
+const short cCoxaMin1[] PROGMEM = {
+  cRRCoxaMin1,  cRMRCoxaMin1,  cRMFCoxaMin1,  cRFCoxaMin1,  cLRCoxaMin1,  cLMRCoxaMin1,   cLMFCoxaMin1,  cLFCoxaMin1};
+const short cCoxaMax1[] PROGMEM = {
+  cRRCoxaMax1,  cRMRCoxaMax1,  cRMFCoxaMax1,  cRFCoxaMax1,  cLRCoxaMax1,  cLMRCoxaMax1,   cLMFCoxaMax1,  cLFCoxaMax1};
+const short cFemurMin1[] PROGMEM ={
+  cRRFemurMin1, cRMRFemurMin1, cRMFFemurMin1, cRFFemurMin1, cLRFemurMin1, cLMRFemurMin1,  cLMFFemurMin1, cLFFemurMin1};
+const short cFemurMax1[] PROGMEM ={
+  cRRFemurMax1, cRMRFemurMax1, cRMFFemurMax1, cRFFemurMax1, cLRFemurMax1, cLMRFemurMax1,  cLMFFemurMax1, cLFFemurMax1};
+const short cTibiaMin1[] PROGMEM ={
+  cRRTibiaMin1, cRMRTibiaMin1, cRMFTibiaMin1, cRFTibiaMin1, cLRTibiaMin1, cLMRTibiaMin1,  cLMFTibiaMin1, cLFTibiaMin1};
+const short cTibiaMax1[] PROGMEM = {
+  cRRTibiaMax1, cRMRTibiaMax1, cRMFTibiaMax1, cRFTibiaMax1, cLRTibiaMax1, cLMRTibiaMax1,  cLMFTibiaMax1, cLFTibiaMax1};
+
+#ifdef c4DOF
+const short cTarsMin1[] PROGMEM = {
+  cRRTarsMin1, cRMRTarsMin1, cRMFTarsMin1, cRFTarsMin1, cLRTarsMin1, cLMRTarsMin1, cLMFTarsMin1, cLFTarsMin1};
+const short cTarsMax1[] PROGMEM = {
+  cRRTarsMax1, cRMRTarsMax1, cRMFTarsMax1, cRFTarsMax1, cLRTarsMax1, cLMRTarsMax1, cLMFTarsMax1, cLFTarsMax1};
+#endif
+#endif
+
+// Servo inverse direction
+const bool cCoxaInv[] = {cRRCoxaInv, cRMRCoxaInv, cRMFCoxaInv, cRFCoxaInv, cLRCoxaInv, cLMRCoxaInv, cLMFCoxaInv, cLFCoxaInv};
+bool cFemurInv[] = {cRRFemurInv, cRMRFemurInv, cRMFFemurInv, cRFFemurInv, cLRFemurInv, cLMRFemurInv, cLMFFemurInv, cLFFemurInv};
+const bool cTibiaInv[] = {cRRTibiaInv, cRMRTibiaInv, cRMFTibiaInv, cRFTibiaInv, cLRTibiaInv, cLMRTibiaInv, cLMFTibiaInv, cLFTibiaInv};
+
+#ifdef c4DOF
+const boolean cTarsInv[] = {cRRTarsInv, cRMRTarsInv, cRMFTarsInv, cRFTarsInv, cLRTarsInv, cLMRTarsInv, cLMFTarsInv, cLFTarsInv};
+#endif  
+
+//Leg Lengths
+const byte cCoxaLength[] PROGMEM = {
+  cRRCoxaLength,  cRMRCoxaLength, cRMFCoxaLength,  cRFCoxaLength,  cLRCoxaLength,  cLMRCoxaLength, cLMFCoxaLength,  cLFCoxaLength};
+const byte cFemurLength[] PROGMEM = {
+  cRRFemurLength, cRMRFemurLength, cRMFFemurLength, cRFFemurLength, cLRFemurLength, cLMRFemurLength, cLMFFemurLength, cLFFemurLength};
+const byte cTibiaLength[] PROGMEM = {
+  cRRTibiaLength, cRMRTibiaLength, cRMFTibiaLength, cRFTibiaLength, cLRTibiaLength, cLMRTibiaLength, cLMFTibiaLength, cLFTibiaLength};
+#ifdef c4DOF
+const byte cTarsLength[] PROGMEM = {
+  cRRTarsLength, cRMRTarsLength, cRMFTarsLength, cRFTarsLength, cLRTarsLength, cLMRTarsLength, cLMFTarsLength, cLFTarsLength};
+#endif
+
+
+//Body Offsets [distance between the center of the body and the center of the coxa]
+const short cOffsetX[] PROGMEM = {
+  cRROffsetX, cRMROffsetX, cRMFOffsetX, cRFOffsetX, cLROffsetX, cLMROffsetX, cLMFOffsetX, cLFOffsetX};
+const short cOffsetZ[] PROGMEM = {
+  cRROffsetZ, cRMROffsetZ, cRMFOffsetZ, cRFOffsetZ, cLROffsetZ, cLMROffsetZ, cLMFOffsetZ, cLFOffsetZ};
+
+//Default leg angle
+const short cCoxaAngle1[] PROGMEM = {
+  cRRCoxaAngle1, cRMRCoxaAngle1, cRMFCoxaAngle1, cRFCoxaAngle1, cLRCoxaAngle1, cLMRCoxaAngle1, cLMFCoxaAngle1, cLFCoxaAngle1};
+
+#ifdef cRRInitCoxaAngle1    // We can set different angles for the legs than just where they servo horns are set...
+const short cCoxaInitAngle1[] PROGMEM = {
+  cRRInitCoxaAngle1, cRMRInitCoxaAnglFe1, cRMFInitCoxaAngle1, cRFInitCoxaAngle1, cLRInitCoxaAngle1, cLMRInitCoxaAngle1, cLMFInitCoxaAngle1, cLFInitCoxaAngle1};
+#endif
+
+//Start positions for the leg
+const short cInitPosX[] PROGMEM = {
+  cRRInitPosX, cRMRInitPosX, cRMFInitPosX, cRFInitPosX, cLRInitPosX, cLMRInitPosX, cLMFInitPosX, cLFInitPosX};
+const short cInitPosY[] PROGMEM = {
+  cRRInitPosY, cRMRInitPosY, cRMFInitPosY, cRFInitPosY, cLRInitPosY, cLMRInitPosY, cLMFInitPosY, cLFInitPosY};
+const short cInitPosZ[] PROGMEM = {
+  cRRInitPosZ, cRMRInitPosZ, cRMFInitPosZ, cRFInitPosZ, cLRInitPosZ, cLMRInitPosZ, cLMFInitPosZ, cLFInitPosZ};
+
+//=============================================================================
 #else
 // Quads...
 // Servo Horn offsets
