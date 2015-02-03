@@ -376,7 +376,7 @@ const short cCoxaAngle1[] PROGMEM = {
 
 #ifdef cRRInitCoxaAngle1    // We can set different angles for the legs than just where they servo horns are set...
 const short cCoxaInitAngle1[] PROGMEM = {
-  cRRInitCoxaAngle1, cRMRInitCoxaAnglFe1, cRMFInitCoxaAngle1, cRFInitCoxaAngle1, cLRInitCoxaAngle1, cLMRInitCoxaAngle1, cLMFInitCoxaAngle1, cLFInitCoxaAngle1};
+  cRRInitCoxaAngle1, cRMRInitCoxaAngle1, cRMFInitCoxaAngle1, cRFInitCoxaAngle1, cLRInitCoxaAngle1, cLMRInitCoxaAngle1, cLMFInitCoxaAngle1, cLFInitCoxaAngle1};
 #endif
 
 //Start positions for the leg
