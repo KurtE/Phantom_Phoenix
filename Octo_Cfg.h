@@ -46,6 +46,16 @@
 #define cLMFTibiaInv 1 
 #define cLFTibiaInv 1 
 
+#define cRMRCoxaInv 0
+#define cRMFCoxaInv 0
+#define cLMRCoxaInv 1 
+#define cLMFCoxaInv 1 
+
+#define cRMRFemurInv 1
+#define cRMFFemurInv 1
+#define cLMRFemurInv 0 
+#define cLMFFemurInv 0 
+
 
 //===================================================================
 // Debug Options
@@ -160,8 +170,8 @@
 #define cLFFemurPin     8   //Front Left leg Hip Vertical
 #define cLFTibiaPin     16   //Front Left leg Knee
 
-#define cTurretRotPin  24   // Turret Rotate Pin
-#define cTurretTiltPin 25  // Turret Tilt pin
+// #define cTurretRotPin  24   // Turret Rotate Pin
+// #define cTurretTiltPin 25  // Turret Tilt pin
 
 //--------------------------------------------------------------------
 //[MIN/MAX ANGLES] - Start off assume same as Phoenix...
@@ -381,21 +391,6 @@ extern const byte g_abHexMaxBodyY[] PROGMEM;
 #define cTarsFactorA	70	//4DOF ONLY
 #define cTarsFactorB	60	//4DOF ONLY
 #define cTarsFactorC	50	//4DOF ONLY
-
-#define cRMRCoxaInv 1 
-#define cRMFCoxaInv 1 
-#define cLMRCoxaInv 0 
-#define cLMFCoxaInv 0 
-
-#define cRMRFemurInv 1 
-#define cRMFFemurInv 1 
-#define cLMRFemurInv 0 
-#define cLMFFemurInv 0 
-
-#define cRMRTibiaInv 1 
-#define cRMFTibiaInv 1 
-#define cLMRTibiaInv 0 
-#define cLMFTibiaInv 0 
 
 #define cRMRTarsInv 1 
 #define cRMFTarsInv 1 
