@@ -1,6 +1,9 @@
 
-// Warning setup to build for standard hexapod or for quad.
-//  #define QUADMODE  
+// Warning setup to build for standard hexapod, octopod, or for quad.
+//  #define QUADMODE
+//  #define HEXMODE
+//  #define OCTOMODE
+//  #define DISPLAY_GAIT_NAMES
 //=============================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix software
@@ -33,6 +36,8 @@
 #include <avr\pgmspace.h>
 #ifdef QUADMODE
 #include "Quad_Cfg.h"
+#elif defined(OCTOMODE)
+#include "Octo_Cfg.h"
 #else
 #include "Hex_Cfg.h"
 #endif

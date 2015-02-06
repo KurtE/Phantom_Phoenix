@@ -69,6 +69,15 @@ static const byte cPinTable[] PROGMEM = {
   , cTurretRotPin, cTurretTiltPin
 #endif
 };
+#elif defined(OCTOMODE)
+static const byte cPinTable[] PROGMEM = {
+  cRRCoxaPin,  cRMRCoxaPin,  cRMFCoxaPin,  cRFCoxaPin,  cLRCoxaPin,   cLMRCoxaPin,  cLMFCoxaPin,  cLFCoxaPin, 
+  cRRFemurPin, cRMRFemurPin, cRMFFemurPin, cRFFemurPin, cLRFemurPin,  cLMRFemurPin, cLMFFemurPin, cLFFemurPin,
+  cRRTibiaPin, cRMRTibiaPin, cRMFTibiaPin, cRFTibiaPin, cLRTibiaPin,  cLMRTibiaPin, cLMFTibiaPin, cLFTibiaPin
+#ifdef c4DOF
+   ,cRRTarsPin, cRMRTarsPin, cRMFTarsPin,  cRFTarsPin, cLRTarsPin, cLMRTarsPin, cLMFTarsPin, cLFTarsPin
+#endif
+};
 #else
 static const byte cPinTable[] PROGMEM = {
   cRRCoxaPin,  cRMCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLMCoxaPin,  cLFCoxaPin, 
@@ -814,8 +823,10 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
   if ((bLen == 1) && ((*psz == 'v') || (*psz == 'V'))) {
     DBGSerial.print(F("Voltage: "));
     DBGSerial.println(GetBatteryVoltage(), DEC);
+#ifdef cVoltagePin 
     DBGSerial.print("Raw Analog: ");
     DBGSerial.println(analogRead(cVoltagePin));
+#endif
 
     DBGSerial.print(F("From Servo 2: "));
     DBGSerial.println(ax12GetRegister (2, AX_PRESENT_VOLTAGE, 1), DEC);    
