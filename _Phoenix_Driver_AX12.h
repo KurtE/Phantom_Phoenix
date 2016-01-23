@@ -185,7 +185,7 @@ word  g_wVoltageSum = 0;
 byte  g_iVoltages = 0;
 
 word ServoDriver::GetBatteryVoltage(void) {
-  g_iVoltages = (++g_iVoltages)&0x7;  // setup index to our array...
+  g_iVoltages = (g_iVoltages + 1)&0x7;  // setup index to our array...
   g_wVoltageSum -= g_awVoltages[g_iVoltages];
   g_awVoltages[g_iVoltages] = analogRead(cVoltagePin);
   g_wVoltageSum += g_awVoltages[g_iVoltages];
@@ -760,8 +760,13 @@ void  ServoDriver::BackgroundProcess(void)
   if (ServosEnabled) {
     DebugToggle(A3);
 
-    int iTimeToNextInterpolate = bioloid.interpolateStep(false);    // Do our background stuff...
-    
+#ifdef cTurnOffVol          // only do if we a turn off voltage is defined
+#ifndef cVoltagePin         // and we are not doing AtoD type of conversion...
+    int iTimeToNextInterpolate = 
+#endif
+#endif    
+    bioloid.interpolateStep(false);    // Do our background stuff...
+
     // Hack if we are not interpolating, maybe try to get voltage.  This will acutally only do this
     // a few times per second.
 #ifdef cTurnOffVol          // only do if we a turn off voltage is defined
@@ -814,9 +819,10 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
   if ((bLen == 1) && ((*psz == 'v') || (*psz == 'V'))) {
     DBGSerial.print(F("Voltage: "));
     DBGSerial.println(GetBatteryVoltage(), DEC);
+#ifdef cVoltagePIN
     DBGSerial.print("Raw Analog: ");
     DBGSerial.println(analogRead(cVoltagePin));
-
+#endif
     DBGSerial.print(F("From Servo 2: "));
     DBGSerial.println(ax12GetRegister (2, AX_PRESENT_VOLTAGE, 1), DEC);    
   }
