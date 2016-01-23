@@ -402,7 +402,9 @@ boolean g_fEnableServos = true;
 
 //--------------------------------------------------------------------
 //[REMOTE]                 
+#ifndef cTravelDeadZone
 #define cTravelDeadZone         4    //The deadzone for the analog input from the remote
+#endif
 //====================================================================
 //[ANGLES]
 short           CoxaAngle1[CNT_LEGS];    //Actual Angle of the horizontal hip, decimals = 1
@@ -1936,7 +1938,7 @@ word GetLegsXZLength(void)
 #endif
 
 #ifndef MAX_XZ_LEG_ADJUST
-#define MAX_XZ_LEG_ADJUST   (cCoxaLength[0]+cTibiaLength[0] + cFemurLength[0]/4) 
+#define MAX_XZ_LEG_ADJUST   (word)(cCoxaLength[0]+cTibiaLength[0] + cFemurLength[0]/4) 
 #endif
 
 void AdjustLegPositions(word XZLength1) 
