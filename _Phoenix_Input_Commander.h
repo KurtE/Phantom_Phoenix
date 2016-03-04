@@ -295,10 +295,13 @@ void CommanderInputController::ControlInput(void)
 #ifdef OPT_SINGLELEG      
       if (ControlMode != SINGLELEGMODE)
         g_InControlState.SelectedLeg=255;
+      else {
+        g_InControlState.SelectedLeg = 0;   // Select leg 0 when we go into this mode. 
+        g_InControlState.PrevSelectedLeg = 255;
 #ifdef DEBUG_SINGLELEG
-      else
         Serial.println("Single Leg Mode");  
 #endif
+      }
 #endif
     }
 
@@ -524,8 +527,9 @@ void CommanderInputController::ControlInput(void)
       g_InControlState.SLLeg.y= (signed char)((int)((int)command.rightV+128)/10); //Right Stick Up/Down
       g_InControlState.SLLeg.z = (signed char)((int)((int)ly+128)/2); //Left Stick Up/Down
 #else
-      g_InControlState.SLLeg.x= lx; //Left Stick Right/Left
-      g_InControlState.SLLeg.y= command.rightV / 5; //Right Stick Up/Down
+      // BUGBUG:: Need to figure out a decent range for these values... 
+      g_InControlState.SLLeg.x = lx; //Left Stick Right/Left
+      g_InControlState.SLLeg.y = command.rightV / 3 - 20; //Right Stick Up/Down
       g_InControlState.SLLeg.z = ly; //Left Stick Up/Down
 #endif
 #ifdef DEBUG_SINGLELEG

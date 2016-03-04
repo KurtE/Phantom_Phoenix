@@ -605,7 +605,6 @@ long            TotalYBal1;
 long            TotalXBal1;
 long            TotalZBal1;
 //[Single Leg Control]
-byte            PrevSelectedLeg;
 boolean         AllDown;
 
 //[gait - State]
@@ -770,7 +769,7 @@ void setup(){
   //Single leg control. Make sure no leg is selected
   #ifdef OPT_SINGLELEG
   g_InControlState.SelectedLeg = 255; // No Leg selected
-  PrevSelectedLeg = 255;
+  g_InControlState.PrevSelectedLeg = 255;
 #endif
   //Body Positions
   g_InControlState.BodyPos.x = 0;
@@ -1235,17 +1234,17 @@ void SingleLegControl(void)
     (LegPosY[cLF]==(short)pgm_read_word(&cInitPosY[cLF]));
 
   if (g_InControlState.SelectedLeg<= (CNT_LEGS-1)) {
-    if (g_InControlState.SelectedLeg!=PrevSelectedLeg) {
+    if (g_InControlState.SelectedLeg!=g_InControlState.PrevSelectedLeg) {
       if (AllDown) { //Lift leg a bit when it got selected
         LegPosY[g_InControlState.SelectedLeg] = (short)pgm_read_word(&cInitPosY[g_InControlState.SelectedLeg])-20;
 
         //Store current status
-        PrevSelectedLeg = g_InControlState.SelectedLeg;
+        g_InControlState.PrevSelectedLeg = g_InControlState.SelectedLeg;
       } 
       else {//Return prev leg back to the init position
-        LegPosX[PrevSelectedLeg] = (short)pgm_read_word(&cInitPosX[PrevSelectedLeg]);
-        LegPosY[PrevSelectedLeg] = (short)pgm_read_word(&cInitPosY[PrevSelectedLeg]);
-        LegPosZ[PrevSelectedLeg] = (short)pgm_read_word(&cInitPosZ[PrevSelectedLeg]);
+        LegPosX[g_InControlState.PrevSelectedLeg] = (short)pgm_read_word(&cInitPosX[g_InControlState.PrevSelectedLeg]);
+        LegPosY[g_InControlState.PrevSelectedLeg] = (short)pgm_read_word(&cInitPosY[g_InControlState.PrevSelectedLeg]);
+        LegPosZ[g_InControlState.PrevSelectedLeg] = (short)pgm_read_word(&cInitPosZ[g_InControlState.PrevSelectedLeg]);
       }
     } 
     else if (!g_InControlState.fSLHold) {
@@ -1263,8 +1262,8 @@ void SingleLegControl(void)
         LegPosZ[LegIndex] = (short)pgm_read_word(&cInitPosZ[LegIndex]);
       }
     } 
-    if (PrevSelectedLeg!=255)
-      PrevSelectedLeg = 255;
+    if (g_InControlState.PrevSelectedLeg!=255)
+      g_InControlState.PrevSelectedLeg = 255;
   }
 #endif
 }

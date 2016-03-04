@@ -235,6 +235,7 @@ typedef struct _InControlState {
   //[Single Leg Control]
 #ifdef OPT_SINGLELEG
   byte          SelectedLeg;
+  byte          PrevSelectedLeg;
   COORD3D       SLLeg;               // 
   boolean       fSLHold;             //Single leg control mode
 #endif
