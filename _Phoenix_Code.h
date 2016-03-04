@@ -1972,8 +1972,11 @@ void LegIK (short IKFeetPosX, short IKFeetPosY, short IKFeetPosZ, byte LegIKLegN
 //--------------------------------------------------------------------
 //[CHECK ANGLES] Checks the mechanical limits of the servos
 //--------------------------------------------------------------------
+#ifdef DEBUG
 short CheckServoAngleBounds(short sID,  short sVal, const short *sMin PROGMEM, const short *sMax PROGMEM) {
-
+#else
+short CheckServoAngleBounds(short sID __attribute__((unused)),  short sVal, const short *sMin PROGMEM, const short *sMax PROGMEM) {
+#endif
     // Pull into simple function as so I can report errors on debug 
     // Note ID is bogus, but something to let me know which one.
     short s = (short)pgm_read_word(sMin);
@@ -2167,6 +2170,8 @@ void RotateLegInitAngles (int iDeltaAngle)
             g_InControlState.aCoxaInitAngle1[LegIndex] = -700;
     }
     g_wLegsXZLength = 0xffff;
+#else
+   iDeltaAngle++;   // remove unused warning...     
 #endif
 }
 

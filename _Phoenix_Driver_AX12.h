@@ -19,7 +19,7 @@
 #endif
 
 #define cPwmMult      128
-#define cPwmDiv       375  
+#define cPwmDiv       375
 #define cPFConst      512    // half of our 1024 range
 
 // Some defines for Voltage processing
@@ -59,11 +59,11 @@ word      g_awGoalAXPos[NUMSERVOS];
 //=============================================================================
 #ifdef QUADMODE
 static const byte cPinTable[] PROGMEM = {
-  cRRCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLFCoxaPin, 
+  cRRCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLFCoxaPin,
   cRRFemurPin, cRFFemurPin, cLRFemurPin, cLFFemurPin,
   cRRTibiaPin, cRFTibiaPin, cLRTibiaPin, cLFTibiaPin
 #ifdef c4DOF
- ,cRRTarsPin,  cRFTarsPin,  cLRTarsPin,  cLFTarsPin
+  , cRRTarsPin,  cRFTarsPin,  cLRTarsPin,  cLFTarsPin
 #endif
 #ifdef cTurretRotPin
   , cTurretRotPin, cTurretTiltPin
@@ -71,20 +71,20 @@ static const byte cPinTable[] PROGMEM = {
 };
 #elif defined(OCTOMODE)
 static const byte cPinTable[] PROGMEM = {
-  cRRCoxaPin,  cRMRCoxaPin,  cRMFCoxaPin,  cRFCoxaPin,  cLRCoxaPin,   cLMRCoxaPin,  cLMFCoxaPin,  cLFCoxaPin, 
+  cRRCoxaPin,  cRMRCoxaPin,  cRMFCoxaPin,  cRFCoxaPin,  cLRCoxaPin,   cLMRCoxaPin,  cLMFCoxaPin,  cLFCoxaPin,
   cRRFemurPin, cRMRFemurPin, cRMFFemurPin, cRFFemurPin, cLRFemurPin,  cLMRFemurPin, cLMFFemurPin, cLFFemurPin,
   cRRTibiaPin, cRMRTibiaPin, cRMFTibiaPin, cRFTibiaPin, cLRTibiaPin,  cLMRTibiaPin, cLMFTibiaPin, cLFTibiaPin
 #ifdef c4DOF
-   ,cRRTarsPin, cRMRTarsPin, cRMFTarsPin,  cRFTarsPin, cLRTarsPin, cLMRTarsPin, cLMFTarsPin, cLFTarsPin
+  , cRRTarsPin, cRMRTarsPin, cRMFTarsPin,  cRFTarsPin, cLRTarsPin, cLMRTarsPin, cLMFTarsPin, cLFTarsPin
 #endif
 };
 #else
 static const byte cPinTable[] PROGMEM = {
-  cRRCoxaPin,  cRMCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLMCoxaPin,  cLFCoxaPin, 
+  cRRCoxaPin,  cRMCoxaPin,  cRFCoxaPin,  cLRCoxaPin,  cLMCoxaPin,  cLFCoxaPin,
   cRRFemurPin, cRMFemurPin, cRFFemurPin, cLRFemurPin, cLMFemurPin, cLFFemurPin,
   cRRTibiaPin, cRMTibiaPin, cRFTibiaPin, cLRTibiaPin, cLMTibiaPin, cLFTibiaPin
 #ifdef c4DOF
-   ,cRRTarsPin, cRMTarsPin, cRFTarsPin, cLRTarsPin, cLMTarsPin, cLFTarsPin
+  , cRRTarsPin, cRMTarsPin, cRFTarsPin, cLRTarsPin, cLMTarsPin, cLFTarsPin
 #endif
 #ifdef cTurretRotPin
   , cTurretRotPin, cTurretTiltPin
@@ -155,9 +155,66 @@ void ServoDriver::Init(void) {
   //  pinMode(0, OUTPUT);
   g_fServosFree = true;
   bioloid.poseSize = NUMSERVOS;
+#ifdef OPT_CHECK_SERVO_RESET
+  uint16_t w;
+  int     count_missing = 0;
+  int     missing_servo = -1;
+  bool    servo_1_in_table = false;
+
+  for (int i = 0; i < NUMSERVOS; i++) {
+    // Set the id
+    int servo_id = pgm_read_byte(&cPinTable[i]);
+    bioloid.setId(i, servo_id);
+
+    if (cPinTable[i] == 1)
+      servo_1_in_table = true;
+
+    // Now try to get it's position
+    w = ax12GetRegister(servo_id, AX_PRESENT_POSITION_L, 2);
+    if (w == 0xffff) {
+      // Try a second time to make sure.
+      delay(25);
+      w = ax12GetRegister(servo_id, AX_PRESENT_POSITION_L, 2);
+      if (w == 0xffff) {
+        // We have a failure
+#ifdef DBGSerial
+        DBGSerial.print("Servo(");
+        DBGSerial.print(i, DEC);
+        DBGSerial.print("): ");
+        DBGSerial.print(servo_id, DEC);
+        DBGSerial.println(" not found");
+#endif
+        if (++count_missing == 1)
+          missing_servo = servo_id;
+      }
+    }
+    delay(25);
+  }
+
+  // Now see if we should try to recover from a potential servo that renumbered itself back to 1.
+#ifdef DBGSerial
+  if (count_missing) {
+    DBGSerial.print("ERROR: Servo driver init: ");
+    DBGSerial.print(count_missing, DEC);
+    DBGSerial.println(" servos missing");
+  }
+#endif
+
+  if ((count_missing == 1) && !servo_1_in_table) {
+    if ((uint16_t)ax12GetRegister(1, AX_PRESENT_POSITION_L, 2) != (uint16_t)0xffff) {
+#ifdef DBGSerial
+      DBGSerial.print("Servo recovery: Servo 1 found - setting id to ");
+      DBGSerial.println(missing_servo, DEC);
+#endif      
+      ax12SetRegister(1, AX_ID, missing_servo);
+    }
+  }
+
+#else
   bioloid.readPose();
-#ifdef cVoltagePin  
-  for (byte i=0; i < 8; i++)
+#endif
+#ifdef cVoltagePin
+  for (byte i = 0; i < 8; i++)
     GetBatteryVoltage();  // init the voltage pin
 #endif
 
@@ -172,7 +229,7 @@ void ServoDriver::Init(void) {
   // of having it do a simple search on each pin...
 #ifdef cTurretRotPin
   bioloid.setId(FIRSTTURRETPIN, cTurretRotPin);
-  bioloid.setId(FIRSTTURRETPIN+1, cTurretTiltPin);
+  bioloid.setId(FIRSTTURRETPIN + 1, cTurretTiltPin);
 #endif
 
   // Added - try to speed things up later if we do a query...
@@ -183,26 +240,27 @@ void ServoDriver::Init(void) {
 
 //--------------------------------------------------------------------
 //GetBatteryVoltage - Maybe should try to minimize when this is called
-// as it uses the serial port... Maybe only when we are not interpolating 
+// as it uses the serial port... Maybe only when we are not interpolating
 // or if maybe some minimum time has elapsed...
 //--------------------------------------------------------------------
 
-#ifdef cVoltagePin  
-word  g_awVoltages[8]={
-  0,0,0,0,0,0,0,0};
+#ifdef cVoltagePin
+word  g_awVoltages[8] = {
+  0, 0, 0, 0, 0, 0, 0, 0
+};
 word  g_wVoltageSum = 0;
 byte  g_iVoltages = 0;
 
 word ServoDriver::GetBatteryVoltage(void) {
-  g_iVoltages = (g_iVoltages + 1)&0x7;  // setup index to our array...
+  g_iVoltages = (g_iVoltages + 1) & 0x7; // setup index to our array...
   g_wVoltageSum -= g_awVoltages[g_iVoltages];
   g_awVoltages[g_iVoltages] = analogRead(cVoltagePin);
   g_wVoltageSum += g_awVoltages[g_iVoltages];
 
 #ifdef CVREF
-  return ((long)((long)g_wVoltageSum*CVREF*(CVADR1+CVADR2))/(long)(8192*(long)CVADR2));  
+  return ((long)((long)g_wVoltageSum * CVREF * (CVADR1 + CVADR2)) / (long)(8192 * (long)CVADR2));
 #else
-  return ((long)((long)g_wVoltageSum*125*(CVADR1+CVADR2))/(long)(2048*(long)CVADR2));  
+  return ((long)((long)g_wVoltageSum * 125 * (CVADR1 + CVADR2)) / (long)(2048 * (long)CVADR2));
 #endif
 }
 
@@ -213,23 +271,23 @@ unsigned long g_ulTimeLastBatteryVoltage;
 
 word ServoDriver::GetBatteryVoltage(void) {
   // In this case, we have to ask a servo for it's current voltage level, which is a lot more overhead than simply doing
-  // one AtoD operation.  So we will limit when we actually do this to maybe a few times per second.  
+  // one AtoD operation.  So we will limit when we actually do this to maybe a few times per second.
   // Also if interpolating, the code will try to only call us when it thinks it won't interfer with timing of interpolation.
   unsigned long ulDeltaTime = millis() - g_ulTimeLastBatteryVoltage;
   if (g_wLastVoltage != 0xffff) {
-      if ( (ulDeltaTime < VOLTAGE_MIN_TIME_BETWEEN_CALLS) 
-            || (bioloid.interpolating &&  (ulDeltaTime < VOLTAGE_MAX_TIME_BETWEEN_CALLS)))
-        return g_wLastVoltage;
+    if ( (ulDeltaTime < VOLTAGE_MIN_TIME_BETWEEN_CALLS)
+         || (bioloid.interpolating &&  (ulDeltaTime < VOLTAGE_MAX_TIME_BETWEEN_CALLS)))
+      return g_wLastVoltage;
   }
 
   // Lets cycle through the Tibia servos asking for voltages as they may be the ones doing the most work...
-  register word wVoltage = ax12GetRegister (pgm_read_byte(&cPinTable[FIRSTTIBIAPIN+g_bLegVoltage]), AX_PRESENT_VOLTAGE, 1);
+  register word wVoltage = ax12GetRegister (pgm_read_byte(&cPinTable[FIRSTTIBIAPIN + g_bLegVoltage]), AX_PRESENT_VOLTAGE, 1);
   if (++g_bLegVoltage >= CNT_LEGS)
     g_bLegVoltage = 0;
   if (wVoltage != 0xffff) {
-      g_ulTimeLastBatteryVoltage = millis();
-      g_wLastVoltage = wVoltage * 10;
-      return g_wLastVoltage;
+    g_ulTimeLastBatteryVoltage = millis();
+    g_wLastVoltage = wVoltage * 10;
+    return g_wLastVoltage;
   }
 
   // Allow it to error our a few times, but if the time until we get a valid response exceeds some time limit then error out.
@@ -244,7 +302,7 @@ word ServoDriver::GetBatteryVoltage(void) {
 //[GP PLAYER]
 //--------------------------------------------------------------------
 #ifdef OPT_GPPLAYER
-EEPromPoseHeader g_eepph;  // current header 
+EEPromPoseHeader g_eepph;  // current header
 byte g_bSeqStepNum;
 word g_wSeqHeaderStart;
 boolean g_fSeqProgmem;
@@ -278,7 +336,7 @@ boolean ServoDriver::FIsGPSeqDefined(uint8_t iSeq)
     return false;
 
   // Now read in the header pointer...
-  EEPROMReadData(GPSEQ_EEPROM_START+iSeq*sizeof(word), (uint8_t*)&g_wSeqHeaderStart, sizeof(g_wSeqHeaderStart));  
+  EEPROMReadData(GPSEQ_EEPROM_START + iSeq * sizeof(word), (uint8_t*)&g_wSeqHeaderStart, sizeof(g_wSeqHeaderStart));
 
   if ((g_wSeqHeaderStart < GPSEQ_EEPROM_START_DATA) || (g_wSeqHeaderStart >= GPSEQ_EEPROM_SIZE))
     return false;  // pointer does not look right.
@@ -287,7 +345,7 @@ boolean ServoDriver::FIsGPSeqDefined(uint8_t iSeq)
   EEPROMReadData(g_wSeqHeaderStart, (uint8_t*)&g_eepph, sizeof(g_eepph));
 
   if ((g_eepph.bSeqNum != iSeq) || (g_eepph.bCntServos != NUMSERVOS) ||
-    ((g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (g_eepph.bCntPoses * sizeof(word) * NUMSERVOS)) >= GPSEQ_EEPROM_SIZE))
+      ((g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (g_eepph.bCntPoses * sizeof(word) * NUMSERVOS)) >= GPSEQ_EEPROM_SIZE))
     return false;
 
   return true;  // Looks like it is valid
@@ -300,7 +358,7 @@ boolean ServoDriver::FIsGPSeqDefined(uint8_t iSeq)
 void ServoDriver::GPStartSeq(uint8_t iSeq)
 {
   if ((iSeq == 0xff) && _fGPActive) {
-    // Caller is asking us to abort... 
+    // Caller is asking us to abort...
     // I think I can simply clear our active flag and it will cleanup...
     // May need to find a way to clear the interpolating...
     _fGPActive = false;
@@ -320,7 +378,8 @@ void ServoDriver::GPStartSeq(uint8_t iSeq)
 //[GP PLAYER]
 //--------------------------------------------------------------------
 static const byte cPinIndexTranslateUpsideDownTable[] PROGMEM = {
-  0x80+1, 0x80+0, 3, 2, 5, 4, 0x80+7, 0x80+6, 9, 8, 11, 10, 0x80+13, 0x80+12, 15, 14, 17, 16}; 
+  0x80 + 1, 0x80 + 0, 3, 2, 5, 4, 0x80 + 7, 0x80 + 6, 9, 8, 11, 10, 0x80 + 13, 0x80 + 12, 15, 14, 17, 16
+};
 
 void ServoDriver::GPPlayer(void)
 {
@@ -354,7 +413,7 @@ void ServoDriver::GPPlayer(void)
 #ifdef USE_PYPOSE_HEADER
     if (g_fSeqProgmem) {
 
-      if (_sGPSM >= 0) 
+      if (_sGPSM >= 0)
         g_ptransCur++;  // lets point to the next step entry.
       else
         g_ptransCur--;  // lets point to the next step entry.
@@ -363,32 +422,32 @@ void ServoDriver::GPPlayer(void)
 
       int poseSize = pgm_read_word_near(pwPose); // number of servos in this pose
 
-        if (!fRobotUpsideDownGPStart) {
-        for(bServo=0; bServo<poseSize; bServo++) {
-          bioloid.setNextPoseByIndex(bServo, pgm_read_word_near(pwPose+1+bServo));  // set a servo value by index for next pose
+      if (!fRobotUpsideDownGPStart) {
+        for (bServo = 0; bServo < poseSize; bServo++) {
+          bioloid.setNextPoseByIndex(bServo, pgm_read_word_near(pwPose + 1 + bServo)); // set a servo value by index for next pose
         }
       }
       else {
-        // Upside down 
-        for(bServo=0; bServo<poseSize; bServo++) {
+        // Upside down
+        for (bServo = 0; bServo < poseSize; bServo++) {
           bServoIndexUpsideDown = pgm_read_byte(&cPinIndexTranslateUpsideDownTable[bServo]);
           if (bServoIndexUpsideDown & 0x80)
-            bioloid.setNextPoseByIndex(bServoIndexUpsideDown&0x7f, 1023-pgm_read_word_near(pwPose+1+bServo));  
+            bioloid.setNextPoseByIndex(bServoIndexUpsideDown & 0x7f, 1023 - pgm_read_word_near(pwPose + 1 + bServo));
           else
-            bioloid.setNextPoseByIndex(bServoIndexUpsideDown, pgm_read_word_near(pwPose+1+bServo));  
+            bioloid.setNextPoseByIndex(bServoIndexUpsideDown, pgm_read_word_near(pwPose + 1 + bServo));
         }
       }
-      // interpolate - Note: we want to take the Speed multipler into account here. 
-      bioloid.interpolateSetup(((long)pgm_read_word(&(g_ptransCur->time))*100)/abs(_sGPSM));
+      // interpolate - Note: we want to take the Speed multipler into account here.
+      bioloid.interpolateSetup(((long)pgm_read_word(&(g_ptransCur->time)) * 100) / abs(_sGPSM));
       return;
     }
 #endif
     // Lets get the sequence information
-    EEPROMReadData(g_wSeqHeaderStart + sizeof(g_eepph) + (g_bSeqStepNum*sizeof(EEPROMPoseSeq)), (uint8_t*)&eepps, sizeof(eepps));
+    EEPROMReadData(g_wSeqHeaderStart + sizeof(g_eepph) + (g_bSeqStepNum * sizeof(EEPROMPoseSeq)), (uint8_t*)&eepps, sizeof(eepps));
 
     // Now lets setup to read in the pose information
-    word wEEPromPoseLoc = g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntPoses*sizeof(EEPROMPoseSeq)) + (eepps.bPoseNum * sizeof(word) * NUMSERVOS); 
-    for (bServo=0; bServo < NUMSERVOS; bServo++) {
+    word wEEPromPoseLoc = g_wSeqHeaderStart + sizeof(g_eepph) + (g_eepph.bCntPoses * sizeof(EEPROMPoseSeq)) + (eepps.bPoseNum * sizeof(word) * NUMSERVOS);
+    for (bServo = 0; bServo < NUMSERVOS; bServo++) {
       EEPROMReadData(wEEPromPoseLoc, (uint8_t*)&wPosePos, sizeof(wPosePos));
       if (!fRobotUpsideDownGPStart) {
         bioloid.setNextPoseByIndex(bServo, wPosePos);  // set a servo value by index for next pose
@@ -396,16 +455,16 @@ void ServoDriver::GPPlayer(void)
       else {
         bServoIndexUpsideDown = pgm_read_byte(&cPinIndexTranslateUpsideDownTable[bServo]);
         if (bServoIndexUpsideDown & 0x80)
-          bioloid.setNextPoseByIndex(bServoIndexUpsideDown&0x7f, 1023-wPosePos);  
+          bioloid.setNextPoseByIndex(bServoIndexUpsideDown & 0x7f, 1023 - wPosePos);
         else
-          bioloid.setNextPoseByIndex(bServoIndexUpsideDown, wPosePos);  
-      }        
+          bioloid.setNextPoseByIndex(bServoIndexUpsideDown, wPosePos);
+      }
       //      bioloid.setNextPose(bServo+1,wPosePos);
       wEEPromPoseLoc += sizeof(word);
     }
 
     // interpolate
-    bioloid.interpolateSetup((((long)eepps.wTime)*100)/abs(_sGPSM));
+    bioloid.interpolateSetup((((long)eepps.wTime) * 100) / abs(_sGPSM));
   }
 }
 
@@ -418,7 +477,7 @@ uint8_t ServoDriver::GPNumSteps(void)          // How many steps does the curren
 
 //------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
-uint8_t ServoDriver::GPCurStep(void)           // Return which step currently on... 
+uint8_t ServoDriver::GPCurStep(void)           // Return which step currently on...
 {
   return _fGPActive ? g_bSeqStepNum + 1 : 0xff;
 }
@@ -437,7 +496,7 @@ void ServoDriver::GPSetSpeedMultiplyer(short sm)      // Set the Speed multiplie
 //------------------------------------------------------------------------------------------
 //[BeginServoUpdate] Does whatever preperation that is needed to starrt a move of our servos
 //------------------------------------------------------------------------------------------
-void ServoDriver::BeginServoUpdate(void)    // Start the update 
+void ServoDriver::BeginServoUpdate(void)    // Start the update
 {
   MakeSureServosAreOn();
   if (ServosEnabled) {
@@ -445,12 +504,12 @@ void ServoDriver::BeginServoUpdate(void)    // Start the update
     if (g_fAXSpeedControl) {
 #ifdef USE_AX12_SPEED_CONTROL
       // If we are trying our own Servo control need to save away the new positions...
-      for (byte i=0; i < NUMSERVOS; i++) {
+      for (byte i = 0; i < NUMSERVOS; i++) {
         g_awCurAXPos[i] = g_awGoalAXPos[i];
       }
 #endif
-    } 
-    else       
+    }
+    else
       bioloid.interpolateStep(true);    // Make sure we call at least once
 
   }
@@ -464,8 +523,8 @@ void ServoDriver::BeginServoUpdate(void)    // Start the update
 void ServoDriver::OutputServoInfoForLeg(byte LegIndex, short sCoxaAngle1, short sFemurAngle1, short sTibiaAngle1, short sTarsAngle1)
 #else
 void ServoDriver::OutputServoInfoForLeg(byte LegIndex, short sCoxaAngle1, short sFemurAngle1, short sTibiaAngle1)
-#endif    
-{        
+#endif
+{
   word    wCoxaSDV;        // Coxa value in servo driver units
   word    wFemurSDV;        //
   word    wTibiaSDV;        //
@@ -473,31 +532,31 @@ void ServoDriver::OutputServoInfoForLeg(byte LegIndex, short sCoxaAngle1, short 
   word    wTarsSDV;        //
 #endif
   // The Main code now takes care of the inversion before calling.
-  wCoxaSDV = (((long)(sCoxaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-  wFemurSDV = (((long)((long)(sFemurAngle1))* cPwmMult) / cPwmDiv +cPFConst);
-  wTibiaSDV = (((long)(sTibiaAngle1))* cPwmMult) / cPwmDiv +cPFConst;
+  wCoxaSDV = (((long)(sCoxaAngle1)) * cPwmMult) / cPwmDiv + cPFConst;
+  wFemurSDV = (((long)((long)(sFemurAngle1)) * cPwmMult) / cPwmDiv + cPFConst);
+  wTibiaSDV = (((long)(sTibiaAngle1)) * cPwmMult) / cPwmDiv + cPFConst;
 #ifdef c4DOF
-  wTarsSDV = (((long)(sTarsAngle1))* cPwmMult) / cPwmDiv +cPFConst;
+  wTarsSDV = (((long)(sTarsAngle1)) * cPwmMult) / cPwmDiv + cPFConst;
 #endif
   if (ServosEnabled) {
     if (g_fAXSpeedControl) {
 #ifdef USE_AX12_SPEED_CONTROL
-      // Save away the new positions... 
-      g_awGoalAXPos[FIRSTCOXAPIN+LegIndex] = wCoxaSDV;    // What order should we store these values?
-      g_awGoalAXPos[FIRSTFEMURPIN+LegIndex] = wFemurSDV;    
-      g_awGoalAXPos[FIRSTTIBIAPIN+LegIndex] = wTibiaSDV;    
+      // Save away the new positions...
+      g_awGoalAXPos[FIRSTCOXAPIN + LegIndex] = wCoxaSDV;  // What order should we store these values?
+      g_awGoalAXPos[FIRSTFEMURPIN + LegIndex] = wFemurSDV;
+      g_awGoalAXPos[FIRSTTIBIAPIN + LegIndex] = wTibiaSDV;
 #ifdef c4DOF
-      g_awGoalAXTarsPos[FIRSTTARSPIN+LegIndex] = wTarsSDV;    
+      g_awGoalAXTarsPos[FIRSTTARSPIN + LegIndex] = wTarsSDV;
 #endif
 #endif
     }
-    else {    
-      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTCOXAPIN+LegIndex]), wCoxaSDV);
-      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTFEMURPIN+LegIndex]), wFemurSDV);
-      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTIBIAPIN+LegIndex]), wTibiaSDV);
+    else {
+      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTCOXAPIN + LegIndex]), wCoxaSDV);
+      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTFEMURPIN + LegIndex]), wFemurSDV);
+      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTIBIAPIN + LegIndex]), wTibiaSDV);
 #ifdef c4DOF
       if ((byte)pgm_read_byte(&cTarsLength[LegIndex]))   // We allow mix of 3 and 4 DOF legs...
-        bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTARSPIN+LegIndex]), wTarsSDV);
+        bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTARSPIN + LegIndex]), wTarsSDV);
 #endif
     }
   }
@@ -538,9 +597,9 @@ word CalculateAX12MoveSpeed(word wCurPos, word wGoalPos, word wTime)
   uint32_t factor;
   word wSpeed;
   // find the amount of travel for each servo
-  if( wGoalPos > wCurPos) {
+  if ( wGoalPos > wCurPos) {
     wTravel = wGoalPos - wCurPos;
-  } 
+  }
   else {
     wTravel = wCurPos - wGoalPos;
   }
@@ -557,7 +616,7 @@ word CalculateAX12MoveSpeed(word wCurPos, word wGoalPos, word wTime)
   if (wSpeed < 26) wSpeed = 26;
 
   return wSpeed;
-} 
+}
 #endif
 
 //------------------------------------------------------------------------------------------
@@ -566,25 +625,25 @@ word CalculateAX12MoveSpeed(word wCurPos, word wGoalPos, word wTime)
 //------------------------------------------------------------------------------------------
 #ifdef cTurretRotPin
 void ServoDriver::OutputServoInfoForTurret(short sRotateAngle1, short sTiltAngle1)
-{        
-  word    wRotateSDV;      
+{
+  word    wRotateSDV;
   word    wTiltSDV;        //
 
   // The Main code now takes care of the inversion before calling.
-  wRotateSDV = (((long)(sRotateAngle1))* cPwmMult) / cPwmDiv +cPFConst;
-  wTiltSDV = (((long)((long)(sTiltAngle1))* cPwmMult) / cPwmDiv +cPFConst);
+  wRotateSDV = (((long)(sRotateAngle1)) * cPwmMult) / cPwmDiv + cPFConst;
+  wTiltSDV = (((long)((long)(sTiltAngle1)) * cPwmMult) / cPwmDiv + cPFConst);
 
   if (ServosEnabled) {
     if (g_fAXSpeedControl) {
 #ifdef USE_AX12_SPEED_CONTROL
-      // Save away the new positions... 
+      // Save away the new positions...
       g_awGoalAXPos[FIRSTTURRETPIN] = wRotateSDV;    // What order should we store these values?
-      g_awGoalAXPos[FIRSTTURRETPIN+1] = wTiltSDV;    
+      g_awGoalAXPos[FIRSTTURRETPIN + 1] = wTiltSDV;
 #endif
     }
-    else {    
+    else {
       bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTURRETPIN]), wRotateSDV);
-      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTURRETPIN+1]), wTiltSDV);
+      bioloid.setNextPose(pgm_read_byte(&cPinTable[FIRSTTURRETPIN + 1]), wTiltSDV);
     }
   }
 #ifdef DEBUG_SERVOS
@@ -605,7 +664,7 @@ void ServoDriver::OutputServoInfoForTurret(short sRotateAngle1, short sTiltAngle
 //--------------------------------------------------------------------
 //[CommitServoDriver Updates the positions of the servos - This outputs
 //         as much of the command as we can without committing it.  This
-//         allows us to once the previous update was completed to quickly 
+//         allows us to once the previous update was completed to quickly
 //        get the next command to start
 //--------------------------------------------------------------------
 void ServoDriver::CommitServoDriver(word wMoveTime)
@@ -633,12 +692,12 @@ void ServoDriver::CommitServoDriver(word wMoveTime)
       for (int i = 0; i < NUMSERVOS; i++) {
         wSpeed = CalculateAX12MoveSpeed(g_awCurAXPos[i], g_awGoalAXPos[i], wMoveTime);    // What order should we store these values?
         byte id = pgm_read_byte(&cPinTable[i]);
-        checksum += id + (g_awGoalAXPos[i]&0xff) + (g_awGoalAXPos[i]>>8) + (wSpeed>>8) + (wSpeed & 0xff);
+        checksum += id + (g_awGoalAXPos[i] & 0xff) + (g_awGoalAXPos[i] >> 8) + (wSpeed >> 8) + (wSpeed & 0xff);
         ax12write(id);
-        ax12write(g_awGoalAXPos[i]&0xff);
-        ax12write(g_awGoalAXPos[i]>>8);
-        ax12write(wSpeed&0xff);
-        ax12write(wSpeed>>8);
+        ax12write(g_awGoalAXPos[i] & 0xff);
+        ax12write(g_awGoalAXPos[i] >> 8);
+        ax12write(wSpeed & 0xff);
+        ax12write(wSpeed >> 8);
 
       }
       ax12write(0xff - (checksum % 256));
@@ -655,7 +714,7 @@ void ServoDriver::CommitServoDriver(word wMoveTime)
   if (g_fDebugOutput)
     DBGSerial.println(wMoveTime, DEC);
 #endif
-  g_InputController.AllowControllerInterrupts(true);    
+  g_InputController.AllowControllerInterrupts(true);
 
 }
 //--------------------------------------------------------------------
@@ -694,12 +753,12 @@ void ServoDriver::FreeServos(void)
   if (!g_fServosFree) {
     g_InputController.AllowControllerInterrupts(false);    // If on xbee on hserial tell hserial to not processess...
     SetRegOnAllServos(AX_TORQUE_ENABLE, 0);  // do this as one statement...
-#if 0    
+#if 0
     for (byte i = 0; i < NUMSERVOS; i++) {
       Relax(pgm_read_byte(&cPinTable[i]));
     }
 #endif
-    g_InputController.AllowControllerInterrupts(true);    
+    g_InputController.AllowControllerInterrupts(true);
     g_fServosFree = true;
   }
 }
@@ -708,7 +767,7 @@ void ServoDriver::FreeServos(void)
 //Function that gets called from the main loop if the robot is not logically
 //     on.  Gives us a chance to play some...
 //--------------------------------------------------------------------
-static uint8_t g_iIdleServoNum  = (uint8_t)-1;
+static uint8_t g_iIdleServoNum  = (uint8_t) - 1;
 static uint8_t g_iIdleLedState = 1;  // what state to we wish to set...
 void ServoDriver::IdleTime(void)
 {
@@ -736,9 +795,9 @@ void MakeSureServosAreOn(void)
 
     g_InputController.AllowControllerInterrupts(false);    // If on xbee on hserial tell hserial to not processess...
     if (g_fAXSpeedControl) {
-      for(int i=0;i<NUMSERVOS;i++){
-        g_awGoalAXPos[i] = ax12GetRegister(pgm_read_byte(&cPinTable[i]),AX_PRESENT_POSITION_L,2);
-        delay(25);   
+      for (int i = 0; i < NUMSERVOS; i++) {
+        g_awGoalAXPos[i] = ax12GetRegister(pgm_read_byte(&cPinTable[i]), AX_PRESENT_POSITION_L, 2);
+        delay(25);
       }
     }
     else {
@@ -751,19 +810,19 @@ void MakeSureServosAreOn(void)
     for (byte i = 0; i < NUMSERVOS; i++) {
       TorqueOn(pgm_read_byte(&cPinTable[i]));
     }
-#endif    
-    g_InputController.AllowControllerInterrupts(true);    
+#endif
+    g_InputController.AllowControllerInterrupts(true);
     g_fServosFree = false;
-  }   
+  }
 }
 
 //==============================================================================
 // BackgroundProcess - Allows us to have some background processing for those
 //    servo drivers that need us to do things like polling...
 //==============================================================================
-void  ServoDriver::BackgroundProcess(void) 
+void  ServoDriver::BackgroundProcess(void)
 {
-  if (g_fAXSpeedControl) 
+  if (g_fAXSpeedControl)
     return;  // nothing to do in this mode...
 
   if (ServosEnabled) {
@@ -771,33 +830,33 @@ void  ServoDriver::BackgroundProcess(void)
 
 #ifdef cTurnOffVol          // only do if we a turn off voltage is defined
 #ifndef cVoltagePin         // and we are not doing AtoD type of conversion...
-    int iTimeToNextInterpolate = 
+    int iTimeToNextInterpolate =
 #endif
-#endif    
-    bioloid.interpolateStep(false);    // Do our background stuff...
+#endif
+      bioloid.interpolateStep(false);    // Do our background stuff...
 
     // Hack if we are not interpolating, maybe try to get voltage.  This will acutally only do this
     // a few times per second.
 #ifdef cTurnOffVol          // only do if we a turn off voltage is defined
 #ifndef cVoltagePin         // and we are not doing AtoD type of conversion...
     if (iTimeToNextInterpolate > VOLTAGE_MIN_TIME_UNTIL_NEXT_INTERPOLATE )      // At least 4ms until next interpolation.  See how this works...
-        GetBatteryVoltage();
-#endif    
+      GetBatteryVoltage();
+#endif
 #endif
   }
 }
 
 
-#ifdef OPT_TERMINAL_MONITOR  
+#ifdef OPT_TERMINAL_MONITOR
 //==============================================================================
 // ShowTerminalCommandList: Allow the Terminal monitor to call the servo driver
 //      to allow it to display any additional commands it may have.
 //==============================================================================
-void ServoDriver::ShowTerminalCommandList(void) 
+void ServoDriver::ShowTerminalCommandList(void)
 {
   DBGSerial.println(F("V - Voltage"));
   DBGSerial.println(F("M - Toggle Motors on or off"));
-  DBGSerial.println(F("F<frame length> - FL in ms"));    // BUGBUG:: 
+  DBGSerial.println(F("F<frame length> - FL in ms"));    // BUGBUG::
   DBGSerial.println(F("A - Toggle AX12 speed control"));
   DBGSerial.println(F("T - Test Servos"));
   DBGSerial.println(F("I - Set Id <frm> <to"));
@@ -807,7 +866,7 @@ void ServoDriver::ShowTerminalCommandList(void)
 #endif
 #ifdef OPT_FIND_SERVO_OFFSETS
   DBGSerial.println(F("O - Enter Servo offset mode"));
-#endif        
+#endif
 }
 
 //==============================================================================
@@ -818,34 +877,34 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
 {
   if ((bLen == 1) && ((*psz == 'm') || (*psz == 'M'))) {
     g_fEnableServos = !g_fEnableServos;
-    if (g_fEnableServos) 
+    if (g_fEnableServos)
       DBGSerial.println(F("Motors are on"));
     else
       DBGSerial.println(F("Motors are off"));
 
-    return true;  
-  } 
+    return true;
+  }
   if ((bLen == 1) && ((*psz == 'v') || (*psz == 'V'))) {
     DBGSerial.print(F("Voltage: "));
     DBGSerial.println(GetBatteryVoltage(), DEC);
-#ifdef cVoltagePin 
+#ifdef cVoltagePin
     DBGSerial.print("Raw Analog: ");
     DBGSerial.println(analogRead(cVoltagePin));
 #endif
 
     DBGSerial.print(F("From Servo 2: "));
-    DBGSerial.println(ax12GetRegister (2, AX_PRESENT_VOLTAGE, 1), DEC);    
+    DBGSerial.println(ax12GetRegister (2, AX_PRESENT_VOLTAGE, 1), DEC);
   }
 
   if ((bLen == 1) && ((*psz == 't') || (*psz == 'T'))) {
     // Test to see if all servos are responding...
-    for(int i=1;i<=NUMSERVOS;i++){
+    for (int i = 1; i <= NUMSERVOS; i++) {
       int iPos;
-      iPos = ax12GetRegister(i,AX_PRESENT_POSITION_L,2);
-      DBGSerial.print(i,DEC);
+      iPos = ax12GetRegister(i, AX_PRESENT_POSITION_L, 2);
+      DBGSerial.print(i, DEC);
       DBGSerial.print(F("="));
       DBGSerial.println(iPos, DEC);
-      delay(25);   
+      delay(25);
     }
   }
   if ((*psz == 'i') || (*psz == 'I')) {
@@ -857,33 +916,33 @@ boolean ServoDriver::ProcessTerminalCommand(byte *psz, byte bLen)
 
   if ((bLen == 1) && ((*psz == 'a') || (*psz == 'A'))) {
     g_fAXSpeedControl = !g_fAXSpeedControl;
-    if (g_fAXSpeedControl) 
+    if (g_fAXSpeedControl)
       DBGSerial.println(F("AX12 Speed Control"));
     else
       DBGSerial.println(F("Bioloid Speed"));
   }
   if ((bLen >= 1) && ((*psz == 'f') || (*psz == 'F'))) {
     psz++;  // need to get beyond the first character
-    while (*psz == ' ') 
+    while (*psz == ' ')
       psz++;  // ignore leading blanks...
     byte bFrame = 0;
     while ((*psz >= '0') && (*psz <= '9')) {  // Get the frame count...
-      bFrame = bFrame*10 + *psz++ - '0';
+      bFrame = bFrame * 10 + *psz++ - '0';
     }
     if (bFrame != 0) {
       DBGSerial.print(F("New Servo Cycles per second: "));
-      DBGSerial.println(1000/bFrame, DEC);
+      DBGSerial.println(1000 / bFrame, DEC);
       extern BioloidControllerEx bioloid;
       bioloid.frameLength = bFrame;
     }
-  } 
+  }
 
 #ifdef OPT_FIND_SERVO_OFFSETS
   else if ((bLen == 1) && ((*psz == 'o') || (*psz == 'O'))) {
     FindServoOffsets();
   }
 #endif
-   return false;
+  return false;
 
 }
 
@@ -902,10 +961,10 @@ void TCSetServoID(byte *psz)
     DBGSerial.print(" ");
     DBGSerial.print(wTo, DEC);
     ax12SetRegister(wFrom, AX_ID, wTo);
-    if (ax12ReadPacket(6)) { // get the response...    
+    if (ax12ReadPacket(6)) { // get the response...
       DBGSerial.print(" Resp: ");
       DBGSerial.println(ax_rx_buffer[4], DEC);
-    } 
+    }
     else
       DBGSerial.println(" failed");
   }
@@ -917,7 +976,7 @@ void TCSetServoID(byte *psz)
 //==============================================================================
 void TCTrackServos()
 {
-  // First read through all of the servos to get their position. 
+  // First read through all of the servos to get their position.
   uint16_t auPos[NUMSERVOS];
   uint16_t  uPos;
   int i;
@@ -927,44 +986,44 @@ void TCTrackServos()
   while (DBGSerial.read() != -1)
     ;
 
-  for(i=0;i<NUMSERVOS;i++){
-    auPos[i] = ax12GetRegister(pgm_read_byte(&cPinTable[i]),AX_PRESENT_POSITION_L,2);
-  }  
+  for (i = 0; i < NUMSERVOS; i++) {
+    auPos[i] = ax12GetRegister(pgm_read_byte(&cPinTable[i]), AX_PRESENT_POSITION_L, 2);
+  }
 
   // Now loop until we get some input on the serial
   while (!DBGSerial.available()) {
     fChange = false;
-    for(int i=0; i<NUMSERVOS; i++){
-      uPos = ax12GetRegister(pgm_read_byte(&cPinTable[i]),AX_PRESENT_POSITION_L,2);
+    for (int i = 0; i < NUMSERVOS; i++) {
+      uPos = ax12GetRegister(pgm_read_byte(&cPinTable[i]), AX_PRESENT_POSITION_L, 2);
       // Lets put in a littl delta or shows lots
       if (abs(auPos[i] - uPos) > 2) {
         auPos[i] = uPos;
         if (fChange)
           DBGSerial.print(", ");
         else
-          fChange = true;  
+          fChange = true;
         DBGSerial.print(pgm_read_byte(&cPinTable[i]), DEC);
         DBGSerial.print(": ");
         DBGSerial.print(uPos, DEC);
-        // Convert back to angle. 
-        int iAng = (((int)uPos-cPFConst)*cPwmDiv)/cPwmMult;
+        // Convert back to angle.
+        int iAng = (((int)uPos - cPFConst) * cPwmDiv) / cPwmMult;
         DBGSerial.print("(");
         DBGSerial.print(iAng, DEC);
         DBGSerial.print(")");
       }
-    }  
+    }
     if (fChange)
       DBGSerial.println();
-    delay(25);   
+    delay(25);
   }
 
 }
 
 
-#endif    
+#endif
 
 //==============================================================================
-//	FindServoOffsets - Find the zero points for each of our servos... 
+//	FindServoOffsets - Find the zero points for each of our servos...
 // 		Will use the new servo function to set the actual pwm rate and see
 //		how well that works...
 //==============================================================================
@@ -1005,13 +1064,13 @@ void EEPROMReadData(word wStart, uint8_t *pv, byte cnt) {
 #define ARB_TEST        25
 
 // Global to this function...
-byte   g_bPoseSize = NUMSERVOS;  
+byte   g_bPoseSize = NUMSERVOS;
 
 short g_poses[540];              // enough for 30 steps...
-typedef struct{
-  byte  pose;    // index of pose to transition to 
+typedef struct {
+  byte  pose;    // index of pose to transition to
   word time;              // time for transition
-} 
+}
 sp_trans_t;
 
 sp_trans_t g_sequence[30];   // sequence
@@ -1036,13 +1095,13 @@ void DoPyPose(byte *psz)
   int checksum = 0;              // checksum
 
 
-    //  pose and sequence storage
+  //  pose and sequence storage
   // Put on diet - convert int to short plus convert poses from 2 dimensions to 1 dimension...
   //
   byte seqPos;                // step in current sequence
 
-  // See if the user gave us a string to process.  If so it should be the XBEE DL to talk to. 
-  // BUGBUG:: if using our XBEE stuff could default to debug terminal... 
+  // See if the user gave us a string to process.  If so it should be the XBEE DL to talk to.
+  // BUGBUG:: if using our XBEE stuff could default to debug terminal...
 #ifdef USEXBEE
 
 #ifdef DBGSerial
@@ -1050,7 +1109,7 @@ void DoPyPose(byte *psz)
   wMY = GetXBeeHVal('M', 'Y');
 
   DBGSerial.print(F("My: "));
-  DBGSerial.println(wMY, HEX);  
+  DBGSerial.println(wMY, HEX);
   wMY = GetXBeeHVal('D', 'L');  // I know reused variable...
   DBGSerial.print(F("PC DL: "));
   DBGSerial.println(wMY, HEX);
@@ -1058,14 +1117,14 @@ void DoPyPose(byte *psz)
   DBGSerial.println(F("$TEXTM$"));  // add some support in VB side to convert to text mode...
 #endif
   // Now lets reset our xbee...
-  APISendXBeeGetCmd('F','R');  // Send a Forced reset...
+  APISendXBeeGetCmd('F', 'R'); // Send a Forced reset...
   delay(2000);
-  while(Serial.read() != -1)
+  while (Serial.read() != -1)
     ;
 
   if (psz) {
     word wDL;
-    for (wDL=0; *psz; psz++) {
+    for (wDL = 0; *psz; psz++) {
       if ((*psz >= '0') && (*psz <= '9'))
         wDL = (wDL << 4) + *psz - '0';
       if ((*psz >= 'a') && (*psz <= 'f'))
@@ -1077,7 +1136,7 @@ void DoPyPose(byte *psz)
 
       Serial.print("+++");
       delay (1000);
-      while ((checksum=Serial.read()) != -1) {
+      while ((checksum = Serial.read()) != -1) {
         //Serial.write((byte)checksum);
       }
       // Now lets set the DL and exit command mode...
@@ -1087,20 +1146,20 @@ void DoPyPose(byte *psz)
     }
   }
   delay(10);
-  while ((checksum=Serial.read()) != -1) {
+  while ((checksum = Serial.read()) != -1) {
     //Serial.write((byte)checksum);
   }
 
-#endif    
+#endif
 
   // process messages
   for (;;) {
-    while(Serial.available() > 0){
+    while (Serial.available() > 0) {
       // We need to 0xFF at start of packet
-      if(mode == 0){         // start of new packet
-        if(Serial.read() == 0xff){
+      if (mode == 0) {       // start of new packet
+        if (Serial.read() == 0xff) {
           mode = 2;
-//          digitalWrite(0,HIGH-digitalRead(0));
+          //          digitalWrite(0,HIGH-digitalRead(0));
         }
         //}else if(mode == 1){   // another start byte
         //    if(Serial.read() == 0xff)
@@ -1108,178 +1167,178 @@ void DoPyPose(byte *psz)
         //    else
         //        mode = 0;
       }
-      else if(mode == 2){   // next byte is index of servo
-        id = Serial.read();    
-        if(id != 0xff)
+      else if (mode == 2) { // next byte is index of servo
+        id = Serial.read();
+        if (id != 0xff)
           mode = 3;
       }
-      else if(mode == 3){   // next byte is length
+      else if (mode == 3) { // next byte is length
         length = Serial.read();
         checksum = id + length;
         mode = 4;
       }
-      else if(mode == 4){   // next byte is instruction
+      else if (mode == 4) { // next byte is instruction
         ins = Serial.read();
         checksum += ins;
         index = 0;
         mode = 5;
       }
-      else if(mode == 5){   // read data in 
+      else if (mode == 5) { // read data in
         g_bParams[index] = Serial.read();
         checksum += (int) g_bParams[index];
         index++;
-        if(index + 1 == length){  // we've read params & checksum
+        if (index + 1 == length) { // we've read params & checksum
           mode = 0;
-          if((checksum%256) != 255){ 
+          if ((checksum % 256) != 255) {
             // return a packet: FF FF id Len Err params=None check
             Serial.write((byte)0xff);
             Serial.write((byte)0xff);
             Serial.write((byte)id);
             Serial.write((byte)2);
             Serial.write((byte)64);
-            Serial.write((byte)(255-((66+id)%256)));
+            Serial.write((byte)(255 - ((66 + id) % 256)));
           }
-          else{
-            if(id == 253){
+          else {
+            if (id == 253) {
               // return a packet: FF FF id Len Err params=None check
               Serial.write((byte)0xff);
               Serial.write((byte)0xff);
               Serial.write((byte)id);
               Serial.write((byte)2);
               Serial.write((byte)0);
-              Serial.write((byte)(255-((2+id)%256)));
+              Serial.write((byte)(255 - ((2 + id) % 256)));
               // special ArbotiX instructions
               // Pose Size = 7, followed by single param: size of pose
               // Load Pose = 8, followed by index, then pose positions (# of param = 2*pose_size)
-              // Load Seq = 9, followed by index/times (# of parameters = 3*seq_size) 
+              // Load Seq = 9, followed by index/times (# of parameters = 3*seq_size)
               // Play Seq = A, no params
-              if(ins == ARB_SIZE_POSE){
+              if (ins == ARB_SIZE_POSE) {
                 g_bPoseSize = bioloid.poseSize = g_bParams[0];
-                bioloid.readPose();    
+                bioloid.readPose();
                 //Serial.println(bioloid.poseSize);
               }
-              else if(ins == ARB_LOAD_POSE){
-                int i;    
+              else if (ins == ARB_LOAD_POSE) {
+                int i;
                 //Serial.print("New Pose:");
                 wPoseIndex = g_bParams[0] * g_bPoseSize;
-                for(i=0; i<bioloid.poseSize; i++){
-                  g_poses[wPoseIndex+i] = g_bParams[(2*i)+1]+(g_bParams[(2*i)+2]<<8); 
+                for (i = 0; i < bioloid.poseSize; i++) {
+                  g_poses[wPoseIndex + i] = g_bParams[(2 * i) + 1] + (g_bParams[(2 * i) + 2] << 8);
                   //Serial.print(g_poses[g_bParams[0]][i]);
-                  //Serial.print(",");     
-                } 
+                  //Serial.print(",");
+                }
                 //Serial.println("");
               }
-              else if(ins == ARB_LOAD_SEQ){
+              else if (ins == ARB_LOAD_SEQ) {
                 int i;
-                for(i=0;i<(length-2)/3;i++){
-                  g_sequence[i].pose = g_bParams[(i*3)];
-                  g_sequence[i].time = g_bParams[(i*3)+1] + (g_bParams[(i*3)+2]<<8);
+                for (i = 0; i < (length - 2) / 3; i++) {
+                  g_sequence[i].pose = g_bParams[(i * 3)];
+                  g_sequence[i].time = g_bParams[(i * 3) + 1] + (g_bParams[(i * 3) + 2] << 8);
                   //Serial.print("New Transition:");
                   //Serial.print((int)g_sequence[i].pose);
                   //Serial.print(" in ");
-                  //Serial.println(g_sequence[i].time);      
+                  //Serial.println(g_sequence[i].time);
                 }
               }
-              else if(ins == ARB_PLAY_SEQ){
+              else if (ins == ARB_PLAY_SEQ) {
                 seqPos = 0;
-                while(g_sequence[seqPos].pose != 0xff){
+                while (g_sequence[seqPos].pose != 0xff) {
                   int i;
                   int p = g_sequence[seqPos].pose;
                   wPoseIndex = p * g_bPoseSize;
                   // are we HALT?
-                  if(Serial.read() == 'H') return;
+                  if (Serial.read() == 'H') return;
                   // load pose
-                  for(i=0; i<bioloid.poseSize; i++){
-                    bioloid.setNextPose(i+1,g_poses[wPoseIndex+i]);
-                  } 
+                  for (i = 0; i < bioloid.poseSize; i++) {
+                    bioloid.setNextPose(i + 1, g_poses[wPoseIndex + i]);
+                  }
                   // interpolate
                   bioloid.interpolateSetup(g_sequence[seqPos].time);
-                  while(bioloid.interpolating)
+                  while (bioloid.interpolating)
                     bioloid.interpolateStep();
                   // next transition
                   seqPos++;
                 }
               }
-              else if(ins == ARB_LOOP_SEQ){
-                while(1){
+              else if (ins == ARB_LOOP_SEQ) {
+                while (1) {
                   seqPos = 0;
-                  while(g_sequence[seqPos].pose != 0xff){
+                  while (g_sequence[seqPos].pose != 0xff) {
                     int i;
                     int p = g_sequence[seqPos].pose;
                     wPoseIndex = p * g_bPoseSize;
                     // are we HALT?
-                    if(Serial.read() == 'H') return;
+                    if (Serial.read() == 'H') return;
                     // load pose
-                    for(i=0; i<bioloid.poseSize; i++){
-                      bioloid.setNextPose(i+1,g_poses[wPoseIndex+i]);
-                    } 
+                    for (i = 0; i < bioloid.poseSize; i++) {
+                      bioloid.setNextPose(i + 1, g_poses[wPoseIndex + i]);
+                    }
                     // interpolate
                     bioloid.interpolateSetup(g_sequence[seqPos].time);
-                    while(bioloid.interpolating)
+                    while (bioloid.interpolating)
                       bioloid.interpolateStep();
                     // next transition
                     seqPos++;
                   }
                 }
               }
-              else if(ins == ARB_SAVE_EEPROM_SEQ){
+              else if (ins == ARB_SAVE_EEPROM_SEQ) {
                 // g_bParams[0] = which location to save to...
                 PyPoseSaveToEEPROM(g_bParams[0]);
               }
-              else if(ins == ARB_TEST){
+              else if (ins == ARB_TEST) {
                 int i;
                 // Test Digital I/O
-                for(i=0;i<8;i++){
+                for (i = 0; i < 8; i++) {
                   // test digital
-                  pinMode(i,OUTPUT);
-                  digitalWrite(i,HIGH);  
+                  pinMode(i, OUTPUT);
+                  digitalWrite(i, HIGH);
                   // test analog
-                  pinMode(31-i,OUTPUT);
-                  digitalWrite(31-i,HIGH);
+                  pinMode(31 - i, OUTPUT);
+                  digitalWrite(31 - i, HIGH);
 
                   delay(500);
-                  digitalWrite(i,LOW);
-                  digitalWrite(31-i,LOW);
+                  digitalWrite(i, LOW);
+                  digitalWrite(31 - i, LOW);
                 }
                 // Test Ax-12
-                for(i=452;i<552;i+=20){
-                  SetPosition(1,i);
+                for (i = 452; i < 552; i += 20) {
+                  SetPosition(1, i);
                   delay(200);
                 }
                 delay(1500);
                 // Test Analog I/O
-                for(i=0;i<8;i++){
+                for (i = 0; i < 8; i++) {
                   // test digital
-                  pinMode(i,OUTPUT);
-                  digitalWrite(i,HIGH);  
+                  pinMode(i, OUTPUT);
+                  digitalWrite(i, HIGH);
                   // test analog
-                  pinMode(31-i,OUTPUT);
-                  digitalWrite(31-i,HIGH);
+                  pinMode(31 - i, OUTPUT);
+                  digitalWrite(31 - i, HIGH);
 
                   delay(500);
-                  digitalWrite(i,LOW);
-                  digitalWrite(31-i,LOW);
+                  digitalWrite(i, LOW);
+                  digitalWrite(31 - i, LOW);
                 }
-              }   
+              }
             }
-            else{
+            else {
               int i;
               // pass thru
-              if(ins == AX_READ_DATA){
+              if (ins == AX_READ_DATA) {
                 ax12GetRegister(id, g_bParams[0], g_bParams[1]);
                 // return a packet: FF FF id Len Err params check
-                if(ax_rx_buffer[3] > 0){
-                  for(i=0;i<ax_rx_buffer[3]+4;i++)
+                if (ax_rx_buffer[3] > 0) {
+                  for (i = 0; i < ax_rx_buffer[3] + 4; i++)
                     Serial.write(ax_rx_buffer[i]);
                 }
                 ax_rx_buffer[3] = 0;
               }
-              else if(ins == AX_WRITE_DATA){
-                if(length == 4){
+              else if (ins == AX_WRITE_DATA) {
+                if (length == 4) {
                   ax12SetRegister(id, g_bParams[0], g_bParams[1]);
                 }
-                else{
-                  int x = g_bParams[1] + (g_bParams[2]<<8);
+                else {
+                  int x = g_bParams[1] + (g_bParams[2] << 8);
                   ax12SetRegister2(id, g_bParams[0], x);
                 }
                 // return a packet: FF FF id Len Err params check
@@ -1288,7 +1347,7 @@ void DoPyPose(byte *psz)
                 Serial.write((byte)id);
                 Serial.write((byte)2);
                 Serial.write((byte)0);
-                Serial.write((byte)(255-((2+id)%256)));
+                Serial.write((byte)(255 - ((2 + id) % 256)));
               }
             }
           }
@@ -1315,18 +1374,18 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
   byte iSeq;
   word w;
   word wHeaderStart;
-  EEPromPoseHeader eepph; 
+  EEPromPoseHeader eepph;
   EEPROMPoseSeq eepps;
   boolean fValidHeaders;
 
   if (bSeqNum >= GPSEQ_EEPROM_MAX_SEQ)
     return false;
 
-  // Lets first see where the data should start and do some validation... 
+  // Lets first see where the data should start and do some validation...
   wHeaderStart = GPSEQ_EEPROM_START_DATA;    // here is where I expect the next one to be...
   fValidHeaders = true;
-  for (iSeq=0; iSeq < bSeqNum; iSeq++) {
-    EEPROMReadData(GPSEQ_EEPROM_START+iSeq*sizeof(word), (uint8_t*)&w, sizeof(w));
+  for (iSeq = 0; iSeq < bSeqNum; iSeq++) {
+    EEPROMReadData(GPSEQ_EEPROM_START + iSeq * sizeof(word), (uint8_t*)&w, sizeof(w));
     if (w != wHeaderStart) {
       fValidHeaders = false;
       break;
@@ -1337,12 +1396,12 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
       break;
     }
     w = wHeaderStart + sizeof(eepph) + (eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (eepph.bCntPoses * sizeof(word) * NUMSERVOS);
-    if (w >= GPSEQ_EEPROM_SIZE) { 
+    if (w >= GPSEQ_EEPROM_SIZE) {
       fValidHeaders = false;
       break;
     }
     wHeaderStart = w;  // save away the last generated one...
-  }    
+  }
 
   // Note: if previous data invalid will try to store data after last valid one...
   eepph.bSeqNum = iSeq;    // save the sequence number here.
@@ -1354,17 +1413,17 @@ boolean PyPoseSaveToEEPROM(byte bSeqNum) {
   }
   eepph.bCntPoses++;  // Cnt not index...
 
-  // Make sure it will fit!  
+  // Make sure it will fit!
   if ((wHeaderStart + sizeof(eepph) + (eepph.bCntSteps * sizeof(EEPROMPoseSeq)) + (eepph.bCntPoses * sizeof(word) * NUMSERVOS)) >= GPSEQ_EEPROM_SIZE)
     return false;
 
   // Now lets start writing out the data...
-  EEPROMWriteData(GPSEQ_EEPROM_START+iSeq*sizeof(word), (uint8_t*)&wHeaderStart, sizeof(wHeaderStart));  
+  EEPROMWriteData(GPSEQ_EEPROM_START + iSeq * sizeof(word), (uint8_t*)&wHeaderStart, sizeof(wHeaderStart));
 
   // Clear out any other headers...
   w = 0;
   while (++iSeq < GPSEQ_EEPROM_MAX_SEQ )
-    EEPROMWriteData(GPSEQ_EEPROM_START+iSeq*sizeof(word), (uint8_t*)&w, sizeof(w));  
+    EEPROMWriteData(GPSEQ_EEPROM_START + iSeq * sizeof(word), (uint8_t*)&w, sizeof(w));
 
 
   // Now write out the sequence header

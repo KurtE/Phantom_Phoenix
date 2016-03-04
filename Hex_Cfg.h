@@ -67,8 +67,10 @@
 // Also define that we are using the AX12 driver
 #define USE_AX12_DRIVER
 #define OPT_BACKGROUND_PROCESS    // The AX12 has a background process
+#define OPT_CHECK_SERVO_RESET     // Try to find single servo that reset it's ID...
 #define OPT_GPPLAYER
 
+#define OPT_SINGLELEG      
 
 //==================================================================================================================================
 //==================================================================================================================================
@@ -146,7 +148,11 @@
 #define cLMFemurPin     15   //Middle Left leg Hip Vertical
 #define cLMTibiaPin     17  //Middle Left leg Knee
 
+#ifdef OPT_CHECK_SERVO_RESET     // Try to find single servo that reset it's ID...
+#define cLFCoxaPin      19   //Front Left leg Hip Horizontal - Avoid servo 1
+#else
 #define cLFCoxaPin      1   //Front Left leg Hip Horizontal
+#endif
 #define cLFFemurPin     3   //Front Left leg Hip Vertical
 #define cLFTibiaPin     5   //Front Left leg Knee
 

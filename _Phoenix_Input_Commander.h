@@ -258,7 +258,7 @@ void CommanderInputController::Init(void)
 // do a lot of bit-bang outputs and it would like us to minimize any interrupts
 // that we do while it is active...
 //==============================================================================
-void CommanderInputController::AllowControllerInterrupts(boolean fAllow)
+void CommanderInputController::AllowControllerInterrupts(boolean fAllow __attribute__((unused)))
 {
   // We don't need to do anything...
 }
@@ -295,6 +295,10 @@ void CommanderInputController::ControlInput(void)
 #ifdef OPT_SINGLELEG      
       if (ControlMode != SINGLELEGMODE)
         g_InControlState.SelectedLeg=255;
+#ifdef DEBUG_SINGLELEG
+      else
+        Serial.println("Single Leg Mode");  
+#endif
 #endif
     }
 
@@ -515,10 +519,22 @@ void CommanderInputController::ControlInput(void)
           g_InControlState.SelectedLeg=0;
       }
 
-      g_InControlState.SLLeg.x= (signed char)((int)lx+128)/2; //Left Stick Right/Left
-      g_InControlState.SLLeg.y= (signed char)((int)command.rightV+128)/10; //Right Stick Up/Down
-      g_InControlState.SLLeg.z = (signed char)((int)ly+128)/2; //Left Stick Up/Down
-
+#if 0
+      g_InControlState.SLLeg.x= (signed char)((int)((int)lx+128)/2); //Left Stick Right/Left
+      g_InControlState.SLLeg.y= (signed char)((int)((int)command.rightV+128)/10); //Right Stick Up/Down
+      g_InControlState.SLLeg.z = (signed char)((int)((int)ly+128)/2); //Left Stick Up/Down
+#else
+      g_InControlState.SLLeg.x= lx; //Left Stick Right/Left
+      g_InControlState.SLLeg.y= command.rightV / 5; //Right Stick Up/Down
+      g_InControlState.SLLeg.z = ly; //Left Stick Up/Down
+#endif
+#ifdef DEBUG_SINGLELEG
+      Serial.print(g_InControlState.SLLeg.x, DEC);
+      Serial.print(",");
+      Serial.print(g_InControlState.SLLeg.y, DEC);
+      Serial.print(",");
+      Serial.println(g_InControlState.SLLeg.z, DEC);
+#endif
       // Hold single leg in place
       if ((command.buttons & BUT_RT) && !(buttonsPrev & BUT_RT)) {
         MSound (1, 50, 2000);  
