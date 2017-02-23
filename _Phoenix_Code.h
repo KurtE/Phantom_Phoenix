@@ -1,4 +1,3 @@
-//=============================================================================
 //Project Lynxmotion Phoenix
 //Description: Phoenix software
 //Software version: V2.0
@@ -2224,7 +2223,7 @@ void AdjustLegPositionsToBodyHeight()
 #ifdef SOUND_PIN
 void SoundNoTimer(unsigned long duration,  unsigned int frequency)
 {
-#ifndef __MK20DX256__
+#ifndef KINETISK
 #ifdef __AVR__
   volatile uint8_t *pin_port;
   volatile uint8_t pin_mask;
