@@ -33,7 +33,7 @@
 #define DEFINE_HEX_GLOBALS
 #include <Arduino.h>
 #include <EEPROM.h>
-#include <avr\pgmspace.h>
+#include <avr/pgmspace.h>
 #ifdef QUADMODE
 #include "Quad_Cfg.h"
 #elif defined(OCTOMODE)
