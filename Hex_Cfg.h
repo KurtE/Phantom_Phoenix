@@ -25,7 +25,7 @@
 // Global defines to control which configuration we are using.  Note: Only define one of these...
 // 
 // Which type of control(s) do you want to compile in
-#if defined(__MK20DX256__)
+#if defined(KINETISK)
 #define DBGSerial         Serial
 #else
 #if defined(UBRR2H)
@@ -81,7 +81,7 @@
 
 //====================================================================
 // XBEE on non mega???
-#if defined(__MK20DX256__)
+#if defined(KINETISK)
 #define XBeeSerial Serial2
 #else
 #if defined(UBRR2H)
@@ -92,7 +92,7 @@
 #define XBEE_BAUD        38400
 //--------------------------------------------------------------------
 //[Arbotix Pin Numbers]
-#if defined(__MK20DX256__)
+#if defined(KINETISK)
 #define SOUND_PIN    6
 #else
 #define SOUND_PIN    1 //0xff        // Tell system we have no IO pin...
@@ -100,7 +100,7 @@
 #endif
 
 // Define Analog pin and minimum voltage that we will allow the servos to run
-#if defined(__MK20DX256__)
+#if defined(KINETISK)
 // Our Teensy board
 #define cVoltagePin  0
 #define CVADR1      402  // VD Resistor 1 - reduced as only need ratio... 40.2K and 10K
